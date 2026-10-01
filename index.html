@@ -43,7 +43,7 @@
     .gallery{columns:3 280px;column-gap:18px}.shot{break-inside:avoid;margin:0 0 18px;position:relative;border-radius:23px;overflow:hidden;background:#ead9dc;box-shadow:0 12px 35px rgba(67,31,42,.09);cursor:zoom-in}.shot img{width:100%;height:auto;transition:transform .55s cubic-bezier(.2,.7,.2,1)}.shot:hover img{transform:scale(1.025)}.shot span{position:absolute;left:13px;bottom:13px;background:rgba(33,18,23,.68);color:white;backdrop-filter:blur(8px);font-size:12px;padding:7px 10px;border-radius:999px;opacity:0;transform:translateY(4px);transition:.25s}.shot:hover span{opacity:1;transform:none}
     .closing{text-align:center;padding-bottom:120px}.closing .heart{font-size:30px;margin-bottom:15px;color:var(--wine2)}.closing h2{font-size:clamp(47px,7vw,86px);max-width:900px;margin:auto}.closing p{color:var(--muted);font-size:17px;line-height:1.75;max-width:650px;margin:24px auto 0}
     .modal{position:fixed;inset:0;z-index:60;background:rgba(16,8,11,.9);display:none;align-items:center;justify-content:center;padding:22px;backdrop-filter:blur(12px)}.modal.open{display:flex}.modal img{max-width:min(96vw,1200px);max-height:90vh;border-radius:18px;object-fit:contain}.close{position:absolute;right:20px;top:max(20px,env(safe-area-inset-top));width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);color:white;background:rgba(255,255,255,.08);cursor:pointer;font-size:22px}
-    .float-heart{position:fixed;z-index:25;right:18px;bottom:max(18px,env(safe-area-inset-bottom));width:50px;height:50px;border-radius:50%;border:0;background:var(--wine);color:white;box-shadow:0 10px 28px rgba(109,36,57,.25);display:grid;place-items:center;cursor:pointer;font-size:18px}
+    .float-heart{position:fixed;z-index:25;right:18px;bottom:max(18px,env(safe-area-inset-bottom));width:50px;height:50px;border-radius:50%;border:0;background:var(--wine);color:white;box-shadow:0 10px 28px rgba(109,36,57,.25);display:grid;place-items:center;cursor:pointer;font-size:18px}.entry-gate{position:fixed;inset:0;z-index:100;background:radial-gradient(circle at 50% 28%,rgba(154,61,89,.20),transparent 38%),#fffaf6;display:grid;place-items:center;padding:24px;transition:opacity .7s ease,visibility .7s ease}.entry-gate.hide{opacity:0;visibility:hidden;pointer-events:none}.entry-box{text-align:center;max-width:520px}.entry-heart{font-size:38px;color:var(--wine2);margin-bottom:12px}.entry-box h2{font-size:clamp(44px,8vw,74px);margin-bottom:18px}.entry-box p{color:var(--muted);line-height:1.7;margin:0 auto 24px;max-width:430px}.entry-btn{border:0;border-radius:999px;padding:15px 24px;background:var(--wine);color:#fff;font-weight:700;cursor:pointer;box-shadow:0 12px 30px rgba(109,36,57,.25)}
     .tiny{position:fixed;pointer-events:none;z-index:24;color:var(--rose);animation:fly 1.8s ease-out forwards}@keyframes fly{to{transform:translate(var(--dx),-150px) rotate(var(--rot));opacity:0}}
     .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}.reveal.on{opacity:1;transform:none}
     footer{padding:22px 0 38px;text-align:center;color:#9a8189;font-size:12px}
@@ -52,7 +52,7 @@
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}.reveal{opacity:1;transform:none}}
   </style>
 </head>
-<body>
+<body>\n<div class="entry-gate" id="entryGate" role="dialog" aria-modal="true" aria-label="Abrir surpresa"><div class="entry-box"><div class="entry-heart">♥</div><h2>Uma surpresa pra você.</h2><p>Toque para entrar.</p><button class="entry-btn" id="entryBtn" type="button">Abrir minha surpresa ♥</button></div></div>
   <nav class="nav" aria-label="Navegação principal">
     <a class="brand" href="#inicio">Sua surpresa ♥</a>
     <div class="navlinks">
@@ -98,16 +98,25 @@
             <h3>Os Anjos Cantam</h3>
             <p>Jorge &amp; Mateus</p>
             <div class="player">
-              <iframe src="https://www.youtube-nocookie.com/embed/ICS6uKC93w0?rel=0" title="Os Anjos Cantam — Jorge & Mateus" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+              <iframe id="musicPlayer" src="https://www.youtube-nocookie.com/embed/ICS6uKC93w0?rel=0&enablejsapi=1&playsinline=1" title="Os Anjos Cantam — Jorge & Mateus" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
             </div>
-            <div class="music-note">Toque no player para ouvir. Em celulares, a reprodução com som precisa ser iniciada por você.</div>
+            <div class="music-note">A música começa ao entrar e aumenta o volume suavemente.</div>
           </article>
 
           <article class="gift-card reveal" id="presente">
             <div>
               <div class="gift-top"><div><div class="eyebrow" style="margin:0">um presente que é seu</div><h3>Escolha o que você quiser.</h3></div><div class="gift-icon">🎁</div></div>
               <p>Além dessa página, eu quero que você tenha liberdade para escolher algo que realmente queira. O saldo pode ser definido aqui e os atalhos abaixo já te levam para algumas lojas.</p>
-              <div class="balance"><div class="balance-head"><small>Saldo do seu presente</small><button class="balance-eye" type="button" aria-label="Mostrar saldo" aria-pressed="false"><svg class="eye-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg><svg class="eye-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 3 18 18M10.6 6.2A11.6 11.6 0 0 1 12 6c6.5 0 10 6 10 6a17.8 17.8 0 0 1-3.1 3.8M6.2 6.2C3.5 8.1 2 12 2 12s3.5 6 10 6c1.5 0 2.8-.3 4-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><strong class="balance-value" data-hidden="R$ ••••" data-value="R$ 0,20">R$ ••••</strong></div>
+              <div class="balance">
+                <div class="balance-head">
+                  <small>Saldo do seu presente</small>
+                  <button class="balance-eye" id="balanceEye" type="button" aria-label="Mostrar saldo" aria-pressed="false" onclick="toggleBalance(event)">
+                    <svg class="eye-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg>
+                    <svg class="eye-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 3 18 18M10.6 6.2A11.6 11.6 0 0 1 12 6c6.5 0 10 6 10 6a17.8 17.8 0 0 1-3.1 3.8M6.2 6.2C3.5 8.1 2 12 2 12s3.5 6 10 6c1.5 0 2.8-.3 4-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
+                <strong class="balance-value" id="balanceValue">R$ ••••</strong>
+              </div>
             </div>
             <div class="shops" aria-label="Lojas virtuais">
               <a class="shop" href="https://www.mercadolivre.com.br/" target="_blank" rel="noopener">Mercado Livre ↗</a>
@@ -162,14 +171,63 @@
     modal.addEventListener('click', e => { if(e.target === modal || e.target.classList.contains('close')) closeModal(); });
     document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
 
-    const balanceEye = document.querySelector('.balance-eye');
-    const balanceValue = document.querySelector('.balance-value');
-    if(balanceEye && balanceValue){
-      balanceEye.addEventListener('click', () => {
-        const revealed = balanceEye.classList.toggle('revealed');
-        balanceValue.textContent = revealed ? balanceValue.dataset.value : balanceValue.dataset.hidden;
-        balanceEye.setAttribute('aria-pressed', String(revealed));
-        balanceEye.setAttribute('aria-label', revealed ? 'Ocultar saldo' : 'Mostrar saldo');
+    let balanceVisible = false;
+    window.toggleBalance = function(ev){
+      if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+      const eye = document.getElementById('balanceEye');
+      const value = document.getElementById('balanceValue');
+      if(!eye || !value) return false;
+      balanceVisible = !balanceVisible;
+      value.textContent = balanceVisible ? 'R$ 0,20' : 'R$ ••••';
+      eye.classList.toggle('revealed', balanceVisible);
+      eye.setAttribute('aria-pressed', balanceVisible ? 'true' : 'false');
+      eye.setAttribute('aria-label', balanceVisible ? 'Ocultar saldo' : 'Mostrar saldo');
+      return false;
+    };
+
+    let ytPlayer = null;
+    let ytReady = false;
+    let startRequested = false;
+    let fadeTimer = null;
+
+    window.onYouTubeIframeAPIReady = function(){
+      ytPlayer = new YT.Player('musicPlayer', {
+        events: {
+          onReady: function(){
+            ytReady = true;
+            if(startRequested) startMusic();
+          }
+        }
+      });
+    };
+
+    function startMusic(){
+      startRequested = true;
+      if(!ytReady || !ytPlayer) return;
+      try{
+        clearInterval(fadeTimer);
+        ytPlayer.setVolume(0);
+        ytPlayer.mute();
+        ytPlayer.playVideo();
+        setTimeout(() => {
+          try{ ytPlayer.unMute(); }catch(e){}
+          let volume = 0;
+          fadeTimer = setInterval(() => {
+            volume += 2;
+            try{ ytPlayer.setVolume(Math.min(volume,55)); }catch(e){}
+            if(volume >= 55) clearInterval(fadeTimer);
+          },120);
+        },250);
+      }catch(e){}
+    }
+
+    const entryGate = document.getElementById('entryGate');
+    const entryBtn = document.getElementById('entryBtn');
+    if(entryBtn && entryGate){
+      entryBtn.addEventListener('click', () => {
+        startMusic();
+        entryGate.classList.add('hide');
+        setTimeout(() => entryGate.remove(), 850);
       });
     }
 
@@ -183,5 +241,5 @@
       }
     });
   </script>
-</body>
+<script src="https://www.youtube.com/iframe_api"></script>\n</body>
 </html>
