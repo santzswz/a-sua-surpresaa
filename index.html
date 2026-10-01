@@ -179,7 +179,7 @@
               <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
               <audio id="bgMusic" preload="auto" loop crossorigin="anonymous" src="https://audio-ssl.itunes.apple.com/apple-assets-us-std-000001/Music5/v4/05/17/87/05178747-080c-f3c2-ef85-238db7a0b1ee/mzaf_5799407815425378880.plus.aac.p.m4a"></audio>
             </div>
-            <div class="music-note">A música entra baixinho e cresce aos poucos junto com a surpresa, sem anúncios.</div>
+            <div class="music-note">A música entra baixinho e chega ao volume ideal em poucos segundos, sem anúncios.</div>
           </article>
 
           <article class="gift-card reveal" id="presente">
@@ -248,7 +248,46 @@
     const photoAudio = new Audio();
     photoAudio.preload = 'auto';
     photoAudio.loop = true;
+    photoAudio.crossOrigin = 'anonymous';
+    let photoAudioCtx = null;
+    let photoSourceNode = null;
+    let photoGainNode = null;
     let activePhoto = null;
+
+    function preparePhotoAudio(){
+      try{
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if(!AudioCtx) return false;
+        if(!photoAudioCtx) photoAudioCtx = new AudioCtx();
+        if(!photoSourceNode){
+          photoSourceNode = photoAudioCtx.createMediaElementSource(photoAudio);
+          photoGainNode = photoAudioCtx.createGain();
+          photoSourceNode.connect(photoGainNode);
+          photoGainNode.connect(photoAudioCtx.destination);
+        }
+        return !!photoGainNode;
+      }catch(e){
+        return false;
+      }
+    }
+
+    function runPhotoFade(duration = 1200, target = 0.72){
+      if(photoGainNode && photoAudioCtx){
+        const now = photoAudioCtx.currentTime;
+        try{
+          photoGainNode.gain.cancelScheduledValues(now);
+          photoGainNode.gain.setValueAtTime(0.0001, now);
+          photoGainNode.gain.linearRampToValueAtTime(0.20, now + 0.28);
+          photoGainNode.gain.linearRampToValueAtTime(0.48, now + 0.72);
+          photoGainNode.gain.linearRampToValueAtTime(target, now + duration / 1000);
+        }catch(e){}
+      }else{
+        try{
+          photoAudio.volume = 0;
+          fadeVolume(photoAudio, target, duration);
+        }catch(e){}
+      }
+    }
 
     function preloadDeezerPreview(img){
       const trackId = img.dataset.trackId;
@@ -279,6 +318,11 @@
 
     function stopPhotoTrack(){
       try{
+        if(photoGainNode && photoAudioCtx){
+          const now = photoAudioCtx.currentTime;
+          photoGainNode.gain.cancelScheduledValues(now);
+          photoGainNode.gain.setValueAtTime(0.0001, now);
+        }
         photoAudio.pause();
         photoAudio.currentTime = 0;
         photoAudio.removeAttribute('src');
@@ -311,10 +355,21 @@
       img.closest('.shot')?.classList.add('playing');
 
       try{
+        const webAudioReady = preparePhotoAudio();
+        if(webAudioReady && photoAudioCtx.state === 'suspended') photoAudioCtx.resume();
+
         photoAudio.src = preview;
-        photoAudio.volume = 0;
+        if(photoGainNode){
+          const now = photoAudioCtx.currentTime;
+          photoGainNode.gain.cancelScheduledValues(now);
+          photoGainNode.gain.setValueAtTime(0.0001, now);
+          photoAudio.volume = 1;
+        }else{
+          photoAudio.volume = 0;
+        }
+
         const p = photoAudio.play();
-        const startFade = () => fadeVolume(photoAudio, 0.68, 1800);
+        const startFade = () => runPhotoFade(1200, 0.72);
         if(p && typeof p.then === 'function') p.then(startFade).catch(()=>{});
         else startFade();
       }catch(e){}
@@ -401,14 +456,14 @@
       }
     }
 
-    function runBackgroundFade(duration = 10000, target = 0.68){
+    function runBackgroundFade(duration = 2600, target = 0.68){
       if(bgGainNode && bgAudioCtx){
         const now = bgAudioCtx.currentTime;
         try{
           bgGainNode.gain.cancelScheduledValues(now);
           bgGainNode.gain.setValueAtTime(0.0001, now);
-          bgGainNode.gain.linearRampToValueAtTime(0.08, now + duration * 0.30 / 1000);
-          bgGainNode.gain.linearRampToValueAtTime(0.28, now + duration * 0.62 / 1000);
+          bgGainNode.gain.linearRampToValueAtTime(0.16, now + 0.38);
+          bgGainNode.gain.linearRampToValueAtTime(0.42, now + 1.18);
           bgGainNode.gain.linearRampToValueAtTime(target, now + duration / 1000);
         }catch(e){}
       }else{
@@ -432,7 +487,7 @@
         }
 
         const p = bgMusic.play();
-        const rise = () => runBackgroundFade(3200, 0.58);
+        const rise = () => runBackgroundFade(1400, 0.58);
         if(p && typeof p.then === 'function') p.then(rise).catch(()=>{});
         else rise();
       }catch(e){}
@@ -459,7 +514,7 @@
 
           const p = bgMusic.play();
           const beginFade = () => {
-            setTimeout(() => runBackgroundFade(10000, 0.68), 180);
+            setTimeout(() => runBackgroundFade(2600, 0.68), 80);
           };
           if(p && typeof p.then === 'function') p.then(beginFade).catch(()=>{});
           else beginFade();
