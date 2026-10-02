@@ -139,6 +139,39 @@
     .shot:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
     .timeline-event article,.reason-card,.memory-card,.wish-card,.growth-card,.secret-card{transform:translateZ(0)}
     .reason-card b,.timeline-event h3,.secret-card h3{letter-spacing:-.015em}
+
+    .entry-date{display:inline-flex;margin:0 auto 9px;padding:7px 11px;border-radius:999px;background:#fff0f4;border:1px solid rgba(154,61,89,.10);color:#a43c5d;font:800 10px "DM Sans",sans-serif;letter-spacing:.17em;text-transform:uppercase}
+    .birthday-date-chip{display:inline-flex;align-items:end;gap:8px;margin-bottom:15px;padding:10px 14px 10px 12px;border-radius:18px;background:linear-gradient(135deg,#6d2439,#a34161);color:white;box-shadow:0 12px 28px rgba(109,36,57,.18)}
+    .birthday-date-chip span{font:700 33px/.8 "Playfair Display",serif}.birthday-date-chip small{padding-bottom:1px;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#ffdce6}
+    .birthday-focus{padding:72px 0 48px}
+    .birthday-focus-shell{position:relative;overflow:hidden;padding:clamp(28px,5vw,58px);border-radius:34px;background:linear-gradient(145deg,#fff8f1 0%,#fff0f4 48%,#fbe3ea 100%);border:1px solid rgba(109,36,57,.09);box-shadow:0 26px 75px rgba(79,34,48,.12)}
+    .birthday-focus-shell:before{content:"15";position:absolute;right:-18px;top:-62px;font:700 clamp(170px,25vw,310px)/1 "Playfair Display",serif;color:rgba(154,61,89,.045);pointer-events:none}
+    .birthday-focus-top{position:relative;z-index:1;display:grid;grid-template-columns:.35fr 1.65fr;gap:32px;align-items:start}
+    .birthday-number{font:700 clamp(100px,16vw,190px)/.78 "Playfair Display",serif;color:#b23f63;letter-spacing:-.07em;text-shadow:0 15px 40px rgba(178,63,99,.11)}
+    .birthday-focus-kicker{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#b64b6d}
+    .birthday-focus-copy h2{font-size:clamp(40px,6vw,72px);margin:10px 0 20px;line-height:1.02}
+    .birthday-focus-copy h2 em{font-weight:600;color:#c84f74}
+    .birthday-focus-copy p{max-width:720px;margin:0;color:#765e67;line-height:1.8;font-size:clamp(15px,2vw,18px)}
+    .birthday-countdown-card{position:relative;z-index:1;display:grid;grid-template-columns:.85fr 1.15fr;gap:24px;align-items:center;margin:38px 0 20px;padding:22px 24px;border-radius:24px;background:rgba(255,255,255,.74);border:1px solid rgba(109,36,57,.09);backdrop-filter:blur(14px)}
+    .birthday-countdown-card small{display:block;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#a95a70}
+    .birthday-countdown-card strong{display:block;margin-top:7px;font:700 clamp(22px,3vw,30px) "Playfair Display",serif;color:#4b2632}
+    .birthday-countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+    .birthday-countdown div{text-align:center;padding:13px 6px 11px;border-radius:16px;background:#6d2439;color:white}
+    .birthday-countdown b{display:block;font:700 clamp(21px,4vw,31px)/1 "Playfair Display",serif;font-variant-numeric:tabular-nums}
+    .birthday-countdown span{display:block;margin-top:6px;font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#f5c8d5}
+    .birthday-wishes{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+    .birthday-wishes article{position:relative;overflow:hidden;padding:24px;border-radius:22px;background:white;border:1px solid rgba(109,36,57,.075);box-shadow:0 12px 32px rgba(78,35,48,.065)}
+    .birthday-wishes article>span{display:inline-grid;place-items:center;width:35px;height:35px;border-radius:12px;background:#fff0f4;color:#b94365;font-size:11px;font-weight:800}
+    .birthday-wishes h3{font:700 clamp(19px,2.5vw,25px)/1.2 "Playfair Display",serif;color:#4b2632;margin:21px 0 10px}
+    .birthday-wishes p{margin:0;color:#816a72;font-size:13px;line-height:1.65}
+    .birthday-focus-note{position:relative;z-index:1;display:flex;align-items:center;gap:15px;margin-top:20px;padding:20px 22px;border-radius:21px;background:#6d2439;color:white}
+    .birthday-focus-note>span{font-size:28px;color:#ff9ab5}
+    .birthday-focus-note p{margin:0;line-height:1.65;color:#f4e8ec}.birthday-focus-note strong{color:white}
+    .birthday-confetti{position:fixed;z-index:550;left:0;top:0;width:8px;height:13px;border-radius:2px;pointer-events:none;animation:bdayConfetti 1.9s cubic-bezier(.18,.7,.25,1) forwards}
+    @keyframes bdayConfetti{0%{opacity:1;transform:translate3d(var(--x0),var(--y0),0) rotate(0deg)}100%{opacity:0;transform:translate3d(var(--x1),var(--y1),0) rotate(var(--spin))}}
+    @media(max-width:820px){.birthday-focus{padding-top:48px}.birthday-focus-shell{border-radius:25px}.birthday-focus-top{grid-template-columns:1fr;gap:12px}.birthday-number{font-size:95px}.birthday-countdown-card{grid-template-columns:1fr;gap:17px}.birthday-wishes{grid-template-columns:1fr}.birthday-wishes article{padding:20px}.birthday-focus-note{align-items:flex-start}}
+    @media(max-width:470px){.birthday-countdown-card{padding:18px 14px}.birthday-countdown{gap:5px}.birthday-countdown div{padding:11px 3px 9px;border-radius:13px}.birthday-countdown b{font-size:22px}.birthday-countdown span{font-size:7px}.birthday-date-chip{margin-bottom:12px}}
+
     @media(max-width:820px){
       .sound-toggle{width:36px;height:36px}
       .nav{gap:8px}
@@ -154,17 +187,18 @@
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}.reveal{opacity:1;transform:none}}
   </style>
 </head>
-<body>\n<div class="entry-gate" id="entryGate" role="dialog" aria-modal="true" aria-label="Abrir surpresa"><div class="entry-box"><div class="entry-heart">♥</div><div class="entry-whisper">feito só para você</div><h2>Hoje é o seu dia.</h2><p>Eu guardei um pedaço de nós aqui. Entra com o som ligado e vai sem pressa.</p><button class="entry-btn" id="entryBtn" type="button">Pode entrar, meu amor ♥</button></div></div>
+<body>\n<div class="entry-gate" id="entryGate" role="dialog" aria-modal="true" aria-label="Abrir surpresa"><div class="entry-box"><div class="entry-heart">♥</div><div class="entry-date">15 de outubro</div><div class="entry-whisper">feito só para você</div><h2>Hoje é o seu dia.</h2><p>Eu guardei um pedaço de nós aqui. Entra com o som ligado e vai sem pressa.</p><button class="entry-btn" id="entryBtn" type="button">Pode entrar, meu amor ♥</button></div></div>
   <div class="experience-progress" aria-hidden="true"><span id="experienceProgress"></span></div><nav class="nav" aria-label="Navegação principal">
     <a class="brand" href="#inicio">Sua surpresa ♥</a>
     <button class="sound-toggle" id="soundToggle" type="button" aria-label="Pausar música" title="Som"><span class="sound-wave" aria-hidden="true">♫</span></button><div class="navlinks">
-      <a href="#carta">Carta</a><a href="#musica">Música</a><a href="#fotos">Fotos</a><a href="#presente">Presente</a>
+      <a href="#aniversario">15/10</a><a href="#carta">Carta</a><a href="#musica">Música</a><a href="#fotos">Fotos</a><a href="#presente">Presente</a>
     </div>
   </nav>
 
   <header class="hero" id="inicio">
     <div class="wrap hero-grid">
       <div>
+        <div class="birthday-date-chip"><span>15</span><small>outubro</small></div>
         <div class="eyebrow">para a pessoa que mudou o significado de certas datas</div>
         <h1>Feliz aniversário, <em>meu amor.</em></h1>
         <p class="lead">Eu não queria te entregar só um presente. Queria te entregar um lugar onde cada detalhe lembrasse uma coisa simples: você se tornou uma das partes mais bonitas da minha vida.</p>
@@ -181,6 +215,57 @@
   </header>
 
   <main>
+
+    <section class="birthday-focus" id="aniversario">
+      <div class="wrap">
+        <div class="birthday-focus-shell reveal">
+          <div class="birthday-focus-top">
+            <div class="birthday-number" aria-hidden="true">15</div>
+            <div class="birthday-focus-copy">
+              <div class="birthday-focus-kicker">outubro • o seu dia</div>
+              <h2>Antes de falar de nós,<br><em>eu quero falar de você.</em></h2>
+              <p>Hoje não é especial só porque existe uma história nossa. É especial porque é o dia em que nasceu a pessoa que eu amo. E, antes de agradecer por ter você comigo, eu quero comemorar você por ser exatamente quem é.</p>
+            </div>
+          </div>
+
+          <div class="birthday-countdown-card" id="birthdayCountdownCard">
+            <div>
+              <small id="birthdayCountdownLabel">contando os segundos para 15 de outubro</small>
+              <strong id="birthdayCountdownHeadline">O seu dia está chegando.</strong>
+            </div>
+            <div class="birthday-countdown" aria-label="Contagem regressiva para 15 de outubro">
+              <div><b id="octDays">00</b><span>dias</span></div>
+              <div><b id="octHours">00</b><span>horas</span></div>
+              <div><b id="octMinutes">00</b><span>min</span></div>
+              <div><b id="octSeconds">00</b><span>seg</span></div>
+            </div>
+          </div>
+
+          <div class="birthday-wishes">
+            <article>
+              <span>01</span>
+              <h3>Que você viva coisas que te deixem orgulhosa.</h3>
+              <p>Quero ver você conquistando o que deseja, descobrindo novos sonhos e olhando para trás com orgulho de tudo o que construiu.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Que você continue sendo você.</h3>
+              <p>Intensa, teimosa, carinhosa, cheia de personalidade e com esse jeito que consegue transformar momentos comuns em lembranças enormes.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Que nunca falte motivo para sorrir.</h3>
+              <p>E quando faltar, eu espero poder estar por perto para tentar arrancar de você pelo menos um daqueles sorrisos bobos que eu tanto gosto.</p>
+            </article>
+          </div>
+
+          <div class="birthday-focus-note">
+            <span>♥</span>
+            <p><strong>Feliz 15 de outubro.</strong> Hoje eu celebro a sua vida, a pessoa que você é e tudo de bonito que ainda existe pela frente.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="time-section story-extras" id="tempo">
       <div class="wrap">
@@ -452,6 +537,67 @@
     const io = new IntersectionObserver(entries => entries.forEach(e => e.isIntersecting && e.target.classList.add('on')), {threshold:.12});
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
+
+
+    function getOctoberBirthdayTarget(now=new Date()){
+      const target=new Date(now.getFullYear(),9,15,0,0,0,0);
+      if(now.getMonth()===9 && now.getDate()===15) return target;
+      if(now>new Date(now.getFullYear(),9,15,23,59,59,999)) target.setFullYear(now.getFullYear()+1);
+      return target;
+    }
+
+    function updateOctoberBirthdayCountdown(){
+      const now=new Date();
+      const isBirthday=now.getMonth()===9 && now.getDate()===15;
+      const label=document.getElementById('birthdayCountdownLabel');
+      const headline=document.getElementById('birthdayCountdownHeadline');
+      const card=document.getElementById('birthdayCountdownCard');
+      const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+
+      if(isBirthday){
+        set('octDays','00');set('octHours','00');set('octMinutes','00');set('octSeconds','00');
+        if(label) label.textContent='15 de outubro chegou';
+        if(headline) headline.textContent='Hoje é o seu dia. Feliz aniversário, meu amor. ♥';
+        if(card) card.classList.add('is-birthday');
+        return;
+      }
+
+      const target=getOctoberBirthdayTarget(now);
+      const diff=Math.max(0,target-now);
+      const days=Math.floor(diff/86400000);
+      const hours=Math.floor((diff/3600000)%24);
+      const minutes=Math.floor((diff/60000)%60);
+      const seconds=Math.floor((diff/1000)%60);
+      set('octDays',String(days).padStart(2,'0'));
+      set('octHours',String(hours).padStart(2,'0'));
+      set('octMinutes',String(minutes).padStart(2,'0'));
+      set('octSeconds',String(seconds).padStart(2,'0'));
+      if(label) label.textContent='contando os segundos para 15 de outubro';
+      if(headline) headline.textContent=target.getFullYear()===now.getFullYear()?'O seu dia está chegando.':'Até o próximo 15 de outubro.';
+      if(card) card.classList.remove('is-birthday');
+    }
+
+    function birthdayConfettiBurst(){
+      const palette=['#d04f76','#f4a8bc','#bd8c4e','#ffd36d','#ffffff','#9a3d59'];
+      const cx=window.innerWidth/2;
+      const cy=Math.min(window.innerHeight*.32,280);
+      for(let i=0;i<34;i++){
+        const piece=document.createElement('i');
+        piece.className='birthday-confetti';
+        piece.style.background=palette[i%palette.length];
+        piece.style.setProperty('--x0',cx+'px');
+        piece.style.setProperty('--y0',cy+'px');
+        piece.style.setProperty('--x1',(cx+(Math.random()*window.innerWidth*.9-window.innerWidth*.45))+'px');
+        piece.style.setProperty('--y1',(cy+180+Math.random()*window.innerHeight*.7)+'px');
+        piece.style.setProperty('--spin',(360+Math.random()*720)+'deg');
+        piece.style.animationDelay=(Math.random()*.16)+'s';
+        document.body.appendChild(piece);
+        setTimeout(()=>piece.remove(),2300);
+      }
+    }
+
+    updateOctoberBirthdayCountdown();
+    setInterval(updateOctoberBirthdayCountdown,1000);
 
     const BIRTHDAY_STORY_START = new Date(2025, 4, 8, 20, 0, 0);
 
@@ -787,6 +933,7 @@
       if(ev){ ev.preventDefault(); ev.stopPropagation(); }
       if(surpriseOpened) return;
       surpriseOpened = true;
+      setTimeout(birthdayConfettiBurst,320);
 
       if(bgMusic){
         try{
