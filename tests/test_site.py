@@ -13,16 +13,76 @@ import re
 import shutil
 import threading
 import unittest
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from playwright.sync_api import expect, sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PROJECT_MOUNT = "/a-sua-surpresaa"
+FULL_TRACK_NAME = "Baco Exu do Blues - Te Amo Disgraça (Faixa 09) [qeO5EBBCPm0].mp3"
 MEDIA_HOSTS = {"api.deezer.com", "audio-ssl.itunes.apple.com", "cdnt-preview.dzcdn.net"}
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        parsed = urlparse(path)
+        if parsed.path == PROJECT_MOUNT or parsed.path.startswith(PROJECT_MOUNT + "/"):
+            path = parsed._replace(path=parsed.path[len(PROJECT_MOUNT):] or "/").geturl()
+        return super().translate_path(path)
+
+    def send_head(self):
+        self._audio_remaining = None
+        path = self.translate_path(self.path)
+        if Path(path).suffix.lower() != ".mp3" or not Path(path).is_file():
+            return super().send_head()
+        source = open(path, "rb")
+        size = os.fstat(source.fileno()).st_size
+        start, end = 0, size - 1
+        requested_range = self.headers.get("Range")
+        if requested_range:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", requested_range.strip())
+            if match and any(match.groups()):
+                first, last = match.groups()
+                if first:
+                    start = int(first)
+                    end = min(int(last), end) if last else end
+                else:
+                    start = max(0, size - int(last))
+            else:
+                start = size
+            if start >= size or end < start:
+                source.close()
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return None
+        self.send_response(206 if requested_range else 200)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1))
+        if requested_range:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.end_headers()
+        source.seek(start)
+        self._audio_remaining = end - start + 1
+        return source
+
+    def copyfile(self, source, outputfile):
+        if self._audio_remaining is None:
+            return super().copyfile(source, outputfile)
+        try:
+            while self._audio_remaining > 0:
+                chunk = source.read(min(65536, self._audio_remaining))
+                if not chunk:
+                    break
+                outputfile.write(chunk)
+                self._audio_remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            # Closing a browser during a media download is expected.
+            pass
+
     def log_message(self, *_args):
         # Gallery filenames and personal text do not need to appear in logs.
         pass
@@ -53,6 +113,7 @@ class SiteTests(unittest.TestCase):
     def setUp(self):
         self.external_requests = []
         self.media_requests = 0
+        self.local_audio_requests = []
         self.runtime_errors = []
         self.page = self.new_page()
 
@@ -66,6 +127,8 @@ class SiteTests(unittest.TestCase):
             if route.request.resource_type == "media":
                 self.media_requests += 1
             if route.request.url.startswith(self.base_url + "/"):
+                if urlparse(route.request.url).path.lower().endswith(".mp3"):
+                    self.local_audio_requests.append(route.request.url)
                 route.continue_()
             else:
                 self.external_requests.append(route.request.url)
@@ -109,15 +172,20 @@ class SiteTests(unittest.TestCase):
         }""")
         self.assertTrue(fits, "The dialog needs to fit its viewport without horizontal scrolling.")
 
-    def mock_immediate_playback(self, deferred=False):
+    def mock_immediate_playback(self, deferred=False, background_duration=30):
         script = """(() => {
+            // Keep deterministic media.volume checks on the native fallback path.
+            window.AudioContext = undefined;
+            window.webkitAudioContext = undefined;
+            window.__createdAudioCount = 0;
             const states = new WeakMap();
             const elements = new Set();
             let nextId = 0;
             const state = element => {
                 if (!states.has(element)) {
                     states.set(element, {id: nextId++, paused: true, ended: false,
-                        currentTime: 0, duration: 30, volume: 1, playCalls: 0,
+                        currentTime: 0, duration: element.id === 'bgMusic' ? __BACKGROUND_DURATION__ : 30,
+                        volume: 1, playCalls: 0,
                         pauseCalls: 0, loads: 0, volumeSamples: [], seeks: []});
                     elements.add(element);
                 }
@@ -125,6 +193,7 @@ class SiteTests(unittest.TestCase):
             };
             const nativeAudio = window.Audio;
             function MockAudio(...args) {
+                window.__createdAudioCount += 1;
                 const audio = new nativeAudio(...args);
                 state(audio);
                 return audio;
@@ -217,10 +286,11 @@ class SiteTests(unittest.TestCase):
                 }
             };
         })();"""
-        self.page.add_init_script(script.replace("__DEFERRED__", str(deferred).lower()))
+        self.page.add_init_script(script.replace("__DEFERRED__", str(deferred).lower())
+                                  .replace("__BACKGROUND_DURATION__", str(background_duration)))
 
-    def enter_with_mocked_music(self):
-        self.mock_immediate_playback()
+    def enter_with_mocked_music(self, **mock_options):
+        self.mock_immediate_playback(**mock_options)
         self.page.goto(self.base_url + "/", wait_until="load")
         self.page.locator("#entryBtn").click()
         expect(self.page.locator("#entryGate")).not_to_be_visible()
@@ -450,6 +520,7 @@ class SiteTests(unittest.TestCase):
         self.assert_no_runtime_errors()
 
     def test_unavailable_background_music_does_not_block_entry(self):
+        self.page.route(re.compile(r"\.mp3(?:\?.*)?$"), lambda route: route.abort())
         self.page.goto(self.base_url + "/", wait_until="load")
         self.page.locator("#entryBtn").click()
         expect(self.page.locator("#entryGate")).not_to_be_visible()
@@ -580,6 +651,128 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(after["playCalls"], before["playCalls"], "Photo browsing must not restart playback.")
         self.assertEqual(after["pauseCalls"], before["pauseCalls"], "Photo browsing must not interrupt playback.")
         self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_matching_photo_reuses_the_full_background_and_its_saved_position(self):
+        self.enter_with_mocked_music(background_duration=290.325)
+        self.page.evaluate("""() => {
+            window.__sharedBackground = __mediaMock.background();
+            __mediaMock.setTime(__sharedBackground, 65.25);
+        }""")
+        before = self.background_snapshot()
+        self.page.locator('.shot-button:has(img[data-track-id="445019772"])').click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.locator("#photoListenBtn").click()
+        self.page.wait_for_function("__sharedBackground.paused")
+        self.assertEqual(self.background_snapshot()["currentTime"], 65.25)
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        resumed = self.background_snapshot()
+        self.assertEqual(resumed["currentTime"], 65.25, "The matching photo must continue the full song rather than restart it.")
+        self.assertEqual(resumed["playCalls"], before["playCalls"] + 1)
+        self.page.keyboard.press("ArrowRight")
+        self.page.keyboard.press("ArrowLeft")
+        self.page.keyboard.press("Escape")
+        after = self.background_snapshot()
+        self.assertFalse(after["paused"])
+        self.assertEqual(after["playCalls"], resumed["playCalls"], "Photo navigation must keep the shared audio playing.")
+        self.assertTrue(self.page.evaluate("__sharedBackground === document.getElementById('bgMusic')"))
+        self.assertEqual(self.page.evaluate("window.__createdAudioCount"), 0, "The full song must not acquire a second audio element.")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_real_full_song_plays_beyond_thirty_seconds_from_the_pages_project_path(self):
+        # These probes retain the native media element and native Web Audio graph.
+        probe = """(() => {
+            window.__realMediaProbe = {firstPlayingTime: null, createdAudio: 0,
+                contexts: [], sourceElements: [], gainSamples: []};
+            const data = window.__realMediaProbe;
+            document.addEventListener('playing', event => {
+                if (event.target.id === 'bgMusic' && data.firstPlayingTime === null)
+                    data.firstPlayingTime = event.target.currentTime;
+            }, true);
+            const NativeAudio = window.Audio;
+            function ObservedAudio(...args) {
+                data.createdAudio += 1;
+                return new NativeAudio(...args);
+            }
+            ObservedAudio.prototype = NativeAudio.prototype;
+            Object.setPrototypeOf(ObservedAudio, NativeAudio);
+            window.Audio = ObservedAudio;
+            const NativeContext = window.AudioContext || window.webkitAudioContext;
+            function ObservedContext(...args) {
+                const context = new NativeContext(...args);
+                data.contexts.push(context);
+                const createGain = context.createGain.bind(context);
+                context.createGain = () => {
+                    const node = createGain();
+                    const setValue = node.gain.setValueAtTime.bind(node.gain);
+                    node.gain.setValueAtTime = (value, at) => {
+                        data.gainSamples.push(value);
+                        return setValue(value, at);
+                    };
+                    return node;
+                };
+                const createSource = context.createMediaElementSource.bind(context);
+                context.createMediaElementSource = element => {
+                    data.sourceElements.push(element);
+                    return createSource(element);
+                };
+                return context;
+            }
+            ObservedContext.prototype = NativeContext.prototype;
+            Object.setPrototypeOf(ObservedContext, NativeContext);
+            window.AudioContext = ObservedContext;
+        })();"""
+        iphone = {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True,
+                  "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"}
+        self.page.close()
+        for name, options in (("desktop", {}), ("iPhone emulation", iphone)):
+            with self.subTest(browser=name):
+                page = self.new_page(**options)
+                page.add_init_script(probe)
+                requests_before = self.media_requests
+                files_before = len(self.local_audio_requests)
+                page.goto(self.base_url + PROJECT_MOUNT + "/", wait_until="load")
+                audio = page.locator("#bgMusic")
+                page.evaluate("window.__fullBackground = document.getElementById('bgMusic')")
+                source = urlparse(audio.evaluate("element => element.src"))
+                self.assertEqual(unquote(source.path), PROJECT_MOUNT + "/" + FULL_TRACK_NAME)
+                self.assertEqual(source.fragment, "")
+                page.wait_for_timeout(200)
+                self.assertEqual(self.media_requests, requests_before, "The MP3 must not load before a listening gesture.")
+                self.assertEqual(len(self.local_audio_requests), files_before)
+                self.assertTrue(audio.evaluate("element => element.paused && element.readyState === 0 && element.currentTime === 0"))
+                self.assertEqual(page.evaluate("__realMediaProbe.contexts.length"), 0, "The audio context must also wait for a gesture.")
+                page.locator("#entryBtn").click()
+                page.wait_for_function("__fullBackground.duration > 280 && !__fullBackground.paused", timeout=20000)
+                self.assertAlmostEqual(audio.evaluate("element => element.duration"), 290.325, delta=1)
+                page.wait_for_function("__realMediaProbe.firstPlayingTime !== null")
+                self.assertLess(page.evaluate("__realMediaProbe.firstPlayingTime"), 0.5, "The full song must begin at its beginning.")
+                page.wait_for_function("__realMediaProbe.gainSamples.some(value => value >= 0.45)")
+                self.assertTrue(page.evaluate("__realMediaProbe.gainSamples.some(value => value > 0 && value < 0.4)"),
+                                "The native Web Audio fade must remain gradual, including iPhone emulation.")
+                page.evaluate("__fullBackground.currentTime = 31")
+                page.wait_for_function("!__fullBackground.seeking && !__fullBackground.paused && !__fullBackground.ended && __fullBackground.currentTime > 31.2", timeout=15000)
+                page.locator('.shot-button:has(img[data-track-id="445019772"])').click()
+                expect(page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+                self.assertTrue(page.locator("#photoTrackLink").evaluate("link => link.href === __fullBackground.src"))
+                page.locator("#photoListenBtn").click()
+                page.wait_for_function("__fullBackground.paused")
+                paused_at = audio.evaluate("element => element.currentTime")
+                self.assertGreater(paused_at, 31)
+                page.locator("#photoListenBtn").click()
+                page.wait_for_function("!__fullBackground.paused && __fullBackground.currentTime > " + str(paused_at + 0.2))
+                page.keyboard.press("ArrowRight")
+                page.keyboard.press("Escape")
+                self.assertTrue(audio.evaluate("element => element === __fullBackground && !element.paused && element.currentTime > 31 && !element.ended && !element.loop"))
+                self.assertEqual(page.evaluate("__realMediaProbe.createdAudio"), 0)
+                self.assertTrue(page.evaluate("__realMediaProbe.sourceElements.length === 1 && __realMediaProbe.sourceElements[0] === __fullBackground"))
+                self.assertGreater(len(self.local_audio_requests), files_before)
+                page.close()
+        previews = any(urlparse(url).hostname == "api.deezer.com" or (urlparse(url).hostname or "").endswith(".dzcdn.net")
+                       for url in self.external_requests)
+        self.assertFalse(previews, "The full local song must not request a Deezer preview.")
         self.assert_no_runtime_errors()
 
     def test_background_fades_progressively_and_resumes_its_saved_position(self):
@@ -776,7 +969,7 @@ class SiteTests(unittest.TestCase):
         after = self.background_snapshot()
         self.assertFalse(after["paused"])
         self.assertEqual(after["playCalls"], before["playCalls"])
-        expect(self.page.locator(".shot.playing")).to_have_count(0)
+        expect(self.page.locator(".shot").first).not_to_have_class(re.compile(r"\bplaying\b"))
         self.assert_no_runtime_errors()
 
     def test_keepsake_quotes_are_accessible_and_do_not_repeat_immediately(self):

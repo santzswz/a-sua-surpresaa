@@ -7,8 +7,8 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 - Envelope de entrada com escolha de ouvir música ou entrar sem som.
 - Carta original, desejos de aniversário, linha do tempo e contador da nossa história.
 - Dez fotografias preservadas no próprio repositório; nove lembranças na galeria, com navegação por botões, teclado e deslize no celular. Cada lembrança ganhou um recado carinhoso, também visível na foto ampliada; as datas da história têm novas notas pessoais.
-- Trecho de **Partilhar — Rubel** durante a leitura: continua ao abrir e navegar pelas fotos, conserva a posição ao pausar e tem transições suaves de volume. As músicas de cada foto entram apenas pelo seu player.
-- Os trechos são prévias de cerca de 30 segundos; terminam sem repetição automática. Os links levam à música completa nos serviços de origem.
+- **Te Amo Disgraça — Baco Exu do Blues**, inteira, no MP3 enviado ao repositório: começa no início e continua ao abrir e navegar pelas fotos, conserva a posição ao pausar e tem entrada e saída suaves. A foto ligada à mesma música compartilha esse áudio, sem reiniciar nem carregar uma prévia.
+- As demais músicas das fotos entram apenas pelo seu player e usam prévias de cerca de 30 segundos. Todas as faixas terminam sem repetição automática; os links das outras músicas levam aos serviços de origem.
 - Um potinho de carinho revela frases da carta original, sem repetir a anterior, e pequenos capítulos dão acesso às datas da história.
 - Presente com a brincadeira dos R$ 0,20 e a revelação dos R$ 300,00. Ocultar o saldo também oculta o valor na mensagem.
 - Recados secretos, foco visível, respeito à preferência por movimento reduzido e conteúdo acessível mesmo sem JavaScript.
@@ -34,7 +34,7 @@ Não há etapa de build nem dependências para publicar. Os caminhos relativos f
 python -m http.server 8000
 ```
 
-Abra `http://localhost:8000`. Só os trechos de música usam serviços externos; as fontes, as fotografias, a carta e os presentes são locais. As licenças SIL Open Font License ficam junto aos arquivos de fontes em `assets/fonts/`.
+Abra `http://localhost:8000`. O MP3 da trilha de fundo, as fontes e as fotografias são locais. Só as prévias das outras músicas usam serviços externos. As licenças SIL Open Font License ficam junto aos arquivos de fontes em `assets/fonts/`.
 
 ## Verificar alterações
 
@@ -55,6 +55,8 @@ O texto, as legendas e as músicas da galeria ficam em `index.html`. As datas de
 
 Os controles de saldo fazem parte da brincadeira visual: o site é público, e o valor também pode ser encontrado no código. Preserve os arquivos de fotos ao editar o projeto.
 
-O áudio começa apenas por uma ação da pessoa. A trilha de fundo continua ao visitar a galeria; uma música de foto substitui a anterior com fade quando seu trecho fica pronto. Cada faixa conserva sua posição nesta visita. O fim da prévia só pode ser reiniciado pelo player, nunca por navegar pelas fotos. O áudio é pausado imediatamente quando a aba fica oculta. Os fades usam o volume nativo, conforme o suporte do navegador. No iOS, onde o volume pode ser controlado apenas pelo sistema, a troca é sequencial para evitar duas músicas tocando juntas.
+O áudio começa apenas por uma ação da pessoa. O MP3 original tem aproximadamente 4min50s e é usado sem cortes ou conversão. A trilha de fundo continua ao visitar a galeria; a foto de Te Amo Disgraça usa o mesmo player. As outras músicas substituem a trilha quando a prévia fica pronta. Cada faixa conserva sua posição nesta visita e só recomeça após o fim por um toque explícito no player. O áudio é pausado imediatamente quando a aba fica oculta.
+
+O fade do MP3 local usa Web Audio quando disponível, inclusive no iOS, com fallback para o volume nativo. O contexto de áudio só é criado ao ouvir a música. As prévias externas continuam usando o volume nativo, conforme o suporte do navegador; no iOS, a troca com essas faixas é sequencial para evitar duas músicas tocando juntas.
 
 O workflow de verificação executa os testes em pull requests e em alterações de `main`. A publicação continua usando a configuração existente do GitHub Pages.

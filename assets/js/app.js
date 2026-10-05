@@ -84,10 +84,17 @@
   let pendingPreview = null;
   let photoRequestState = 'idle';
   const previewCache = new Map();
+  const backgroundSong = background?.dataset.song || 'A nossa trilha';
+  const isBackgroundPhoto = photo => Boolean(background?.dataset.trackId
+    && photo?.image.dataset.trackId === background.dataset.trackId);
+  const selectedPhotoAudio = photo => isBackgroundPhoto(photo)
+    ? audioState.target === 'background'
+    : audioState.target === 'photo' && audioState.trackId === photo?.image.dataset.trackId;
   let audioState = { desired: false, target: null, state: 'idle', playing: false,
     backgroundPlaying: false, photoPlaying: false, backgroundState: 'idle' };
   const audioController = window.SurpriseAudio?.createController({
     background,
+    backgroundGain: true,
     sequentialTransitions: /iPad|iPhone|iPod/.test(navigator.userAgent)
       || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1),
     onChange: snapshot => { audioState = snapshot; renderAudio(); }
@@ -107,38 +114,41 @@
     const backgroundPlaying = Boolean(enabled && audioState.backgroundPlaying);
     const backgroundEnded = audioState.backgroundState === 'ended';
     musicPlayButton?.setAttribute('aria-pressed', String(backgroundPlaying));
-    musicPlayButton?.setAttribute('aria-label', backgroundPlaying ? 'Pausar Partilhar'
-      : backgroundEnded ? 'Ouvir o trecho de Partilhar novamente' : 'Continuar Partilhar');
+    musicPlayButton?.setAttribute('aria-label', backgroundPlaying ? `Pausar ${backgroundSong}`
+      : backgroundEnded ? `Ouvir ${backgroundSong} novamente` : `Continuar ${backgroundSong}`);
     if (musicPlayButton) musicPlayButton.textContent = backgroundPlaying ? 'Ⅱ' : '▶︎';
     document.querySelector('.audio-panel')?.classList.toggle('is-playing', backgroundPlaying);
-    if (musicStatus) musicStatus.textContent = backgroundPlaying ? 'Tocando um trecho de Partilhar, sem repetir.'
-      : backgroundEnded ? 'O trecho chegou ao fim. Você pode ouvir a música completa pelo link abaixo.'
+    if (musicStatus) musicStatus.textContent = backgroundPlaying ? `Tocando ${backgroundSong}, inteira.`
+      : backgroundEnded ? 'A música chegou ao fim. Toque em ▶︎ se quiser ouvir de novo.'
       : audioState.backgroundError ? audioState.backgroundError === 'blocked'
-        ? 'Toque em ▶︎ para permitir a reprodução deste trecho.'
-        : 'Não foi possível tocar a trilha. Você pode ouvir a música completa pelo link abaixo.'
+        ? 'Toque em ▶︎ para permitir a reprodução da música.'
+        : 'Não foi possível tocar a trilha. Toque em ▶︎ para tentar de novo.'
       : audioState.target === 'background' && audioState.state === 'loading' ? 'Preparando a nossa trilha…'
       : audioState.target === 'photo' && enabled ? 'A trilha está pausada enquanto você ouve esta lembrança.'
       : 'Música pausada. Toque em ▶︎ para continuar.';
-    const selectedTrack = photos[photoIndex]?.image.dataset.trackId;
-    const selectedAudio = audioState.target === 'photo' && audioState.trackId === selectedTrack;
-    const photoPlaying = Boolean(enabled && selectedAudio && audioState.photoPlaying);
+    const selectedIsBackground = isBackgroundPhoto(photos[photoIndex]);
+    const selectedAudio = selectedPhotoAudio(photos[photoIndex]);
+    const photoPlaying = Boolean(enabled && selectedAudio
+      && (selectedIsBackground ? audioState.backgroundPlaying : audioState.photoPlaying));
+    const excerpt = selectedIsBackground ? 'música' : 'trecho';
     photoListenButton?.setAttribute('aria-pressed', String(photoPlaying));
     photoListenButton?.setAttribute('aria-label', photoPlaying ? 'Pausar música da foto'
-      : selectedAudio && audioState.state === 'ended' ? 'Ouvir o trecho da foto novamente' : 'Continuar música da foto');
+      : selectedAudio && audioState.state === 'ended' ? `Ouvir ${excerpt} da foto novamente` : 'Continuar música da foto');
     if (photoListenButton) photoListenButton.textContent = photoPlaying ? 'Ⅱ' : '▶︎';
     if (photoMusicStatus) photoMusicStatus.textContent = photoRequestState === 'loading' ? 'Preparando o trecho…'
       : photoRequestState === 'error' || (selectedAudio && audioState.error === 'unavailable')
-        ? 'O trecho está indisponível. Você ainda pode ouvir a música completa.'
-      : selectedAudio && audioState.error === 'blocked' ? 'Toque em ▶︎ para permitir a reprodução deste trecho.'
-      : photoPlaying ? 'Tocando um trecho desta lembrança, sem repetir.'
-      : selectedAudio && audioState.state === 'loading' ? 'Preparando o trecho…'
-      : selectedAudio && audioState.state === 'ended' ? 'O trecho terminou. Toque em ▶︎ para ouvir novamente.'
-      : !enabled ? 'Som desligado. Toque em ▶︎ para ouvir um trecho.'
+        ? selectedIsBackground ? 'Não foi possível tocar a música. Toque em ▶︎ para tentar de novo.'
+          : 'O trecho está indisponível. Você ainda pode ouvir a música completa.'
+      : selectedAudio && audioState.error === 'blocked' ? `Toque em ▶︎ para permitir a reprodução ${selectedIsBackground ? 'desta música' : 'deste trecho'}.`
+      : photoPlaying ? selectedIsBackground ? 'A música inteira continua com a gente.' : 'Tocando um trecho desta lembrança, sem repetir.'
+      : selectedAudio && audioState.state === 'loading' ? `Preparando ${selectedIsBackground ? 'a música' : 'o trecho'}…`
+      : selectedAudio && audioState.state === 'ended' ? `${selectedIsBackground ? 'A música terminou' : 'O trecho terminou'}. Toque em ▶︎ para ouvir novamente.`
+      : !enabled ? `Som desligado. Toque em ▶︎ para ouvir ${selectedIsBackground ? 'a música' : 'um trecho'}.`
       : backgroundPlaying ? 'A nossa trilha continua. Toque em ▶︎ para ouvir esta lembrança.'
       : enabled && audioState.photoPlaying && !selectedAudio ? 'A música anterior continua. Toque em ▶︎ para ouvir esta lembrança.'
-      : 'Toque em ▶︎ para continuar o trecho desta lembrança.';
-    photos.forEach(photo => photo.figure.classList.toggle('playing', enabled && audioState.photoPlaying
-      && photo.image.dataset.trackId === audioState.trackId));
+      : `Toque em ▶︎ para continuar ${selectedIsBackground ? 'a música' : 'o trecho'} desta lembrança.`;
+    photos.forEach(photo => photo.figure.classList.toggle('playing', enabled && selectedPhotoAudio(photo)
+      && (isBackgroundPhoto(photo) ? audioState.backgroundPlaying : audioState.photoPlaying)));
     const duration = audioState.backgroundDuration;
     const elapsed = audioState.backgroundTime || 0;
     const clock = seconds => `${Math.floor(seconds / 60)}:${pad(Math.floor(seconds % 60))}`;
@@ -235,6 +245,12 @@
   }
   async function playPhoto() {
     if (photoIndex < 0 || document.hidden) return;
+    if (isBackgroundPhoto(photos[photoIndex])) {
+      enabled = true;
+      backgroundWanted = true;
+      playBackground({ explicit: true });
+      return;
+    }
     cancelPhotoRequest();
     enabled = true;
     photoRequestState = 'loading';
@@ -275,7 +291,7 @@
     } else { enabled = true; backgroundWanted = true; playBackground({ explicit: true }); }
   });
   photoListenButton?.addEventListener('click', () => {
-    const selected = audioState.target === 'photo' && audioState.trackId === photos[photoIndex]?.image.dataset.trackId;
+    const selected = selectedPhotoAudio(photos[photoIndex]);
     if (enabled && (photoRequestState === 'loading' || (selected && ['playing', 'loading'].includes(audioState.state)))) stopAudio();
     else void playPhoto();
   });
@@ -315,7 +331,8 @@
     const link = byId('photoTrackLink');
     if (link) {
       const id = photo.image.dataset.trackId;
-      link.href = /^\d+$/.test(id || '') ? `https://www.deezer.com/track/${id}`
+      link.href = isBackgroundPhoto(photo) ? background.src
+        : /^\d+$/.test(id || '') ? `https://www.deezer.com/track/${id}`
         : `https://www.deezer.com/search/${encodeURIComponent(song)}`;
     }
     if (!photoDialog.open) { lockPage(); photoDialog.showModal(); }

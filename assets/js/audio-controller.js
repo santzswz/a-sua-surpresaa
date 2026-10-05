@@ -12,6 +12,10 @@
     const setTimer = options.setTimer || ((callback, delay) => setTimeout(callback, delay));
     const clearTimer = options.clearTimer || (id => clearTimeout(id));
     const makeAudio = options.makeAudio || (() => new Audio());
+    const makeAudioContext = options.makeAudioContext || (() => {
+      const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+      return AudioContext ? new AudioContext() : null;
+    });
     const onChange = options.onChange || (() => {});
     const fadeDuration = options.fadeDuration ?? 900;
     const pauseDuration = options.pauseDuration ?? 350;
@@ -30,7 +34,7 @@
     function snapshot() {
       const background = tracks.get('background');
       const audible = entry => Boolean(desired && !suspended && entry && !entry.audio.paused
-        && entry.status === 'playing' && entry.gain > 0);
+        && entry.status === 'playing' && entry.gain > 0 && outputRunning(entry));
       return {
         desired, suspended, target: active?.kind || null, trackId: active?.trackId || null,
         state: active?.status || 'idle', error: active?.error || null,
@@ -52,8 +56,105 @@
       if (!Number.isFinite(duration) || duration <= 0 || endFadeSeconds <= 0) return 1;
       return Math.max(0, Math.min(1, (duration - entry.audio.currentTime) / endFadeSeconds));
     }
+    function outputRunning(entry) {
+      return !entry.output || (entry.output.ready && !entry.output.routeFailed
+        && entry.output.context.state === 'running');
+    }
     function applyVolume(entry) {
-      try { entry.audio.volume = Math.max(0, Math.min(1, entry.gain * tail(entry))); } catch {}
+      const level = Math.max(0, Math.min(1, entry.gain * tail(entry)));
+      if (entry.output?.gainNode) {
+        // The local file uses a gain node because iOS ignores media volume.
+        try { entry.audio.volume = 1; } catch {}
+        const parameter = entry.output.gainNode.gain;
+        try {
+          if (typeof parameter.setValueAtTime === 'function') {
+            parameter.setValueAtTime(level, entry.output.context.currentTime);
+          } else parameter.value = level;
+          return;
+        } catch {
+          const output = entry.output;
+          // Keep the already-attached media audible if its gain node fails.
+          try { output.source.disconnect(); } catch {}
+          try { output.gainNode.disconnect(); } catch {}
+          output.gainNode = null;
+          try { output.source.connect(output.context.destination); }
+          catch {
+            output.routeFailed = true;
+            output.ready = false;
+            if (active === entry) fail(entry, 'unavailable', revision);
+            else {
+              clearPlaybackTimer(entry);
+              entry.fade = null;
+              entry.status = 'error';
+              entry.error = 'unavailable';
+              entry.gain = 0;
+              entry.audio.pause();
+              notify();
+            }
+            return;
+          }
+        }
+      }
+      try { entry.audio.volume = level; } catch {}
+    }
+    function localBackground(entry) {
+      if (options.backgroundGain !== true || entry.kind !== 'background') return false;
+      // Never route a third-party preview into Web Audio without CORS access.
+      if (typeof location === 'undefined') return true;
+      try { return new URL(entry.audio.currentSrc || entry.audio.src, location.href).origin === location.origin; }
+      catch { return false; }
+    }
+    function closeUnusedContext(context) {
+      try { Promise.resolve(context?.close?.()).catch(() => {}); } catch {}
+    }
+    function prepareOutput(entry) {
+      if (!entry.outputAttempted && localBackground(entry)) {
+        entry.outputAttempted = true;
+        let context;
+        try {
+          context = makeAudioContext();
+          if (context) {
+            // Build the destination side before attaching the media element.
+            // Failures here leave its ordinary native output untouched.
+            const gainNode = context.createGain();
+            gainNode.gain.value = 0;
+            gainNode.connect(context.destination);
+            const source = context.createMediaElementSource(entry.audio);
+            entry.output = { context, source, gainNode, ready: false, routeFailed: false };
+            try { source.connect(gainNode); }
+            catch {
+              // Once attached, an element cannot return to its native output.
+              // A direct route keeps it audible if the gain connection fails.
+              entry.output.gainNode = null;
+              try { gainNode.disconnect(); } catch {}
+              try { source.connect(context.destination); }
+              catch { entry.output.routeFailed = true; }
+            }
+          }
+        } catch {
+          if (!entry.output) closeUnusedContext(context);
+        }
+      }
+      const output = entry.output;
+      if (!output) return Promise.resolve();
+      applyVolume(entry);
+      if (output.routeFailed) return Promise.reject(new Error('Audio output unavailable'));
+      if (output.context.state === 'running') {
+        output.ready = true;
+        return Promise.resolve();
+      }
+      output.ready = false;
+      // This call occurs before media.play(), in the original click gesture.
+      try {
+        return Promise.resolve(output.context.resume()).then(() => {
+          if (output.context.state !== 'running') {
+            const error = new Error('Audio output requires a new playback gesture');
+            error.name = output.context.state === 'closed' ? 'InvalidStateError' : 'NotAllowedError';
+            throw error;
+          }
+          output.ready = true;
+        });
+      } catch (error) { return Promise.reject(error); }
     }
     function finishAtEnd(entry) {
       const duration = entry.audio.duration;
@@ -97,7 +198,7 @@
     function fade(entry, level, duration, pause = false) {
       entry.fade = null;
       // iOS controls media volume in hardware; avoid two full-volume sources.
-      if (sequentialTransitions) duration = 0;
+      if (sequentialTransitions && !entry.output?.gainNode) duration = 0;
       if (duration <= 0 || entry.audio.paused) {
         entry.gain = level;
         applyVolume(entry);
@@ -121,6 +222,7 @@
     }
     function startPlaying(entry) {
       if (!canStart(entry)) { entry.audio.pause(); return; }
+      if (!outputRunning(entry)) return;
       clearPlaybackTimer(entry);
       if (entry.status !== 'playing') {
         entry.status = 'playing';
@@ -157,7 +259,7 @@
       audio.preload = 'none';
       audio.removeAttribute?.('crossorigin');
       const entry = { key, kind, trackId, audio, level, gain: 0, fade: null,
-        status: 'idle', error: null, timer: null, listeners: [] };
+        status: 'idle', error: null, timer: null, listeners: [], output: null, outputAttempted: false };
       tracks.set(key, entry);
       function listen(name, handler) {
         audio.addEventListener(name, handler);
@@ -202,7 +304,7 @@
     async function select(entry, { explicit = false } = {}) {
       if (destroyed || !entry) return false;
       if (active === entry && desired && !suspended
-        && (entry.status === 'playing' || entry.status === 'loading')) return true;
+        && (entry.status === 'loading' || (entry.status === 'playing' && outputRunning(entry)))) return true;
       revision += 1;
       const token = revision;
       const earlier = active;
@@ -241,10 +343,23 @@
         entry.status = 'paused';
       }
       if (suspended) { notify(); return false; }
+      const outputReady = prepareOutput(entry);
       if (!entry.audio.paused) {
         entry.status = 'loading';
-        startPlaying(entry);
-        return true;
+        entry.timer = setTimer(() => fail(entry, 'unavailable', token), 12000);
+        notify();
+        try {
+          await outputReady;
+          if (token !== revision) {
+            if (!canStart(entry)) entry.audio.pause();
+            return false;
+          }
+          startPlaying(entry);
+          return entry.status === 'playing';
+        } catch (error) {
+          if (token === revision) fail(entry, error?.name === 'NotAllowedError' ? 'blocked' : 'unavailable', token);
+          return false;
+        }
       }
       entry.status = 'loading';
       entry.gain = 0;
@@ -255,14 +370,17 @@
       notify();
       entry.timer = setTimer(() => fail(entry, 'unavailable', token), 12000);
       try {
-        await entry.audio.play();
+        let playback;
+        try { playback = entry.audio.play(); }
+        catch (error) { playback = Promise.reject(error); }
+        await Promise.all([playback, outputReady]);
         if (token !== revision) {
           // Keep a newer request on this same element; silence obsolete play promises.
           if (!canStart(entry)) entry.audio.pause();
           return false;
         }
         startPlaying(entry);
-        return true;
+        return entry.status === 'playing';
       } catch (error) {
         if (token === revision) fail(entry, error?.name === 'NotAllowedError' ? 'blocked' : 'unavailable', token);
         return false;
@@ -313,6 +431,11 @@
       cancelFades();
       for (const entry of tracks.values()) {
         entry.listeners.forEach(([name, handler]) => entry.audio.removeEventListener(name, handler));
+        if (entry.output) {
+          try { entry.output.source.disconnect(); } catch {}
+          try { entry.output.gainNode?.disconnect(); } catch {}
+          closeUnusedContext(entry.output.context);
+        }
       }
       tracks.clear();
     }
