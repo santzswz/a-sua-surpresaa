@@ -72,7 +72,8 @@
   const photoDialog = document.querySelector('.photo-dialog');
   const photos = [...document.querySelectorAll('.shot')].map(figure => ({
     figure, button: figure.querySelector('.shot-button'), image: figure.querySelector('img'),
-    caption: figure.querySelector('figcaption')?.textContent.trim() || ''
+    caption: figure.querySelector('figcaption')?.textContent.trim() || '',
+    note: figure.querySelector('.shot-note')?.textContent.trim() || ''
   })).filter(photo => photo.button && photo.image);
   let enabled = false;
   let backgroundWanted = true;
@@ -305,6 +306,7 @@
     const image = byId('modalImg');
     if (image) { image.src = photo.image.currentSrc || photo.image.src; image.alt = photo.image.alt; }
     setText('photoCaption', photo.caption || photo.image.alt);
+    setText('photoNote', photo.note);
     setText('photoCounter', `${pad(photoIndex + 1)} / ${pad(photos.length)}`);
     const song = photo.image.dataset.song || 'A trilha desta lembrança';
     const artist = photo.image.dataset.artist;
