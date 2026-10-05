@@ -6,7 +6,7 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 
 - Envelope de entrada com escolha de ouvir música ou entrar sem som.
 - Carta original, desejos de aniversário, linha do tempo e contador da nossa história.
-- Dez fotografias preservadas no próprio repositório; nove lembranças na galeria, com navegação por botões, teclado e deslize no celular.
+- Dez fotografias preservadas no próprio repositório; nove lembranças na galeria, com navegação por botões, teclado e deslize no celular. Cada lembrança ganhou um recado carinhoso, também visível na foto ampliada; as datas da história têm novas notas pessoais.
 - Trecho de **Partilhar — Rubel** durante a leitura: continua ao abrir e navegar pelas fotos, conserva a posição ao pausar e tem transições suaves de volume. As músicas de cada foto entram apenas pelo seu player.
 - Os trechos são prévias de cerca de 30 segundos; terminam sem repetição automática. Os links levam à música completa nos serviços de origem.
 - Um potinho de carinho revela frases da carta original, sem repetir a anterior, e pequenos capítulos dão acesso às datas da história.

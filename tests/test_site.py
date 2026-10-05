@@ -307,6 +307,52 @@ class SiteTests(unittest.TestCase):
         self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
+    def test_photo_note_and_accessible_description_follow_selection(self):
+        self.enter_quietly()
+        preserved_frames = self.page.locator(".gallery").evaluate("""gallery => {
+            const shots = [...gallery.querySelectorAll(':scope > figure.shot')];
+            return shots.length === 9 && shots.every(shot =>
+                shot.querySelector('.shot-button img[data-track-id][data-song][data-artist]') &&
+                shot.querySelector('figcaption') && shot.querySelector(':scope > p.shot-note'));
+        }""")
+        self.assertTrue(preserved_frames, "The nine gallery frames must keep their captions and music metadata.")
+        meaningful_notes = self.page.locator(".gallery .shot-note").evaluate_all("""notes => {
+            const texts = notes.map(note => note.textContent.trim());
+            return texts.every(Boolean) && texts.some(text => text !== texts[0]);
+        }""")
+        self.assertTrue(meaningful_notes, "Photo notes must contain text specific to more than one memory.")
+        matches_selected = r"""index => {
+            const normalize = text => (text || '').trim().replace(/\s+/g, ' ');
+            const shot = document.querySelectorAll('.gallery > figure.shot')[index];
+            const dialog = document.querySelector('.photo-dialog');
+            const note = document.getElementById('photoNote');
+            const caption = document.getElementById('photoCaption');
+            const ids = attribute => (dialog.getAttribute(attribute) || '').split(/\s+/);
+            return dialog.open && note && caption && shot
+                && normalize(note.textContent).length > 0
+                && normalize(note.textContent) === normalize(shot.querySelector('.shot-note')?.textContent)
+                && normalize(caption.textContent) === normalize(shot.querySelector('figcaption')?.textContent)
+                && ids('aria-labelledby').includes(caption.id)
+                && ids('aria-describedby').includes(note.id);
+        }"""
+        self.page.locator(".shot-button").first.click()
+        for index in range(9):
+            if index:
+                self.page.keyboard.press("ArrowRight")
+            self.page.wait_for_function(matches_selected, arg=index)
+            expect(self.page.locator("#photoNote")).to_be_visible()
+        self.page.keyboard.press("ArrowRight")
+        self.page.wait_for_function(matches_selected, arg=0)
+        self.page.keyboard.press("ArrowLeft")
+        self.page.wait_for_function(matches_selected, arg=8)
+        self.page.keyboard.press("Escape")
+        self.page.locator(".shot-button").nth(1).click()
+        self.page.wait_for_function(matches_selected, arg=1)
+        expect(self.page.locator("#photoNote")).to_be_visible()
+        self.page.keyboard.press("Escape")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
     def test_gift_reveal_and_hide_do_not_expose_the_real_value(self):
         self.enter_quietly()
         eye = self.page.locator("#balanceEye")
