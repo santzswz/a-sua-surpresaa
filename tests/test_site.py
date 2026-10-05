@@ -109,22 +109,142 @@ class SiteTests(unittest.TestCase):
         }""")
         self.assertTrue(fits, "The dialog needs to fit its viewport without horizontal scrolling.")
 
-    def mock_immediate_playback(self):
-        self.page.add_init_script("""(() => {
-            const playing = new WeakSet();
-            Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
-                configurable: true, get() { return !playing.has(this); }
+    def mock_immediate_playback(self, deferred=False):
+        script = """(() => {
+            const states = new WeakMap();
+            const elements = new Set();
+            let nextId = 0;
+            const state = element => {
+                if (!states.has(element)) {
+                    states.set(element, {id: nextId++, paused: true, ended: false,
+                        currentTime: 0, duration: 30, volume: 1, playCalls: 0,
+                        pauseCalls: 0, loads: 0, volumeSamples: [], seeks: []});
+                    elements.add(element);
+                }
+                return states.get(element);
+            };
+            const nativeAudio = window.Audio;
+            function MockAudio(...args) {
+                const audio = new nativeAudio(...args);
+                state(audio);
+                return audio;
+            }
+            MockAudio.prototype = nativeAudio.prototype;
+            Object.setPrototypeOf(MockAudio, nativeAudio);
+            window.Audio = MockAudio;
+            for (const name of ['paused', 'ended', 'duration']) {
+                Object.defineProperty(HTMLMediaElement.prototype, name, {
+                    configurable: true, get() { return state(this)[name]; }
+                });
+            }
+            Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+                configurable: true,
+                get() { return state(this).currentTime; },
+                set(value) {
+                    const data = state(this);
+                    data.currentTime = Number(value);
+                    data.ended = false;
+                    data.seeks.push(data.currentTime);
+                }
             });
+            Object.defineProperty(HTMLMediaElement.prototype, 'volume', {
+                configurable: true,
+                get() { return state(this).volume; },
+                set(value) {
+                    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError('Invalid test volume');
+                    const data = state(this);
+                    data.volume = value;
+                    data.volumeSamples.push({at: performance.now(), value});
+                }
+            });
+            window.__pendingPlayback = [];
             HTMLMediaElement.prototype.play = function () {
-                playing.add(this);
-                this.dispatchEvent(new Event('playing'));
+                const audio = this;
+                state(audio).playCalls += 1;
+                const start = () => {
+                    const data = state(audio);
+                    data.paused = false;
+                    data.ended = false;
+                    audio.dispatchEvent(new Event('loadedmetadata'));
+                    audio.dispatchEvent(new Event('playing'));
+                };
+                if (__DEFERRED__) return new Promise(resolve => {
+                    window.__pendingPlayback.push(() => { start(); resolve(); });
+                });
+                start();
                 return Promise.resolve();
             };
             HTMLMediaElement.prototype.pause = function () {
-                playing.delete(this);
+                const data = state(this);
+                data.pauseCalls += 1;
+                if (data.paused) return;
+                data.paused = true;
                 this.dispatchEvent(new Event('pause'));
             };
-        })();""")
+            HTMLMediaElement.prototype.load = function () {
+                this.pause();
+                const data = state(this);
+                data.currentTime = 0;
+                data.ended = false;
+                data.loads += 1;
+                this.dispatchEvent(new Event('emptied'));
+            };
+            window.__mediaMock = {
+                background: () => document.getElementById('bgMusic'),
+                allPaused: () => [...elements].every(element => element.paused),
+                photo: track => [...elements].find(element =>
+                    element !== document.getElementById('bgMusic') &&
+                    element.src.endsWith('/preview-' + track + '.mp3')),
+                snapshot: element => ({...state(element), loop: element.loop,
+                    seeks: [...state(element).seeks], volumeSamples: [...state(element).volumeSamples]}),
+                setTime: (element, value) => {
+                    element.currentTime = value;
+                    element.dispatchEvent(new Event('timeupdate'));
+                },
+                finish: element => {
+                    const data = state(element);
+                    data.currentTime = data.duration;
+                    data.paused = true;
+                    data.ended = true;
+                    element.dispatchEvent(new Event('timeupdate'));
+                    element.dispatchEvent(new Event('ended'));
+                },
+                setHidden: hidden => {
+                    Object.defineProperty(document, 'hidden', {configurable: true, get: () => hidden});
+                    Object.defineProperty(document, 'visibilityState', {
+                        configurable: true, get: () => hidden ? 'hidden' : 'visible'});
+                    document.dispatchEvent(new Event('visibilitychange'));
+                }
+            };
+        })();"""
+        self.page.add_init_script(script.replace("__DEFERRED__", str(deferred).lower()))
+
+    def enter_with_mocked_music(self):
+        self.mock_immediate_playback()
+        self.page.goto(self.base_url + "/", wait_until="load")
+        self.page.locator("#entryBtn").click()
+        expect(self.page.locator("#entryGate")).not_to_be_visible()
+        expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "true")
+
+    def background_snapshot(self):
+        return self.page.evaluate("__mediaMock.snapshot(__mediaMock.background())")
+
+    def mock_available_previews(self):
+        requested_tracks = []
+
+        def available_preview(route):
+            self.external_requests.append(route.request.url)
+            track = urlparse(route.request.url).path.rsplit("/", 1)[-1]
+            requested_tracks.append(track)
+            callback = parse_qs(urlparse(route.request.url).query).get("callback", [""])[0]
+            self.assertRegex(callback, r"^surprisePreview_[A-Za-z0-9_]+$")
+            route.fulfill(
+                content_type="application/javascript",
+                body=f'{callback}({{"preview":"https://cdnt-preview.dzcdn.net/preview-{track}.mp3"}});',
+            )
+
+        self.page.route("https://api.deezer.com/**", available_preview)
+        return requested_tracks
 
     def test_content_stays_visible_without_javascript(self):
         page = self.new_page(java_script_enabled=False)
@@ -141,6 +261,7 @@ class SiteTests(unittest.TestCase):
         self.assertFalse(invisible, "Reading content must not depend on JavaScript reveal effects.")
         expect(page.locator("#secretMessage")).to_have_attribute("hidden", "")
         expect(page.locator("#realBalanceMessage")).not_to_be_visible()
+        self.assertIsNone(page.locator("#bgMusic").get_attribute("loop"), "Music must not loop without JavaScript.")
         self.assert_no_media_requests()
 
     def test_quiet_entry_sets_focus_and_never_requests_audio(self):
@@ -328,73 +449,60 @@ class SiteTests(unittest.TestCase):
             expect(toggle).to_have_attribute("aria-pressed", str(enabled).lower())
             if enabled:
                 expect(panel).to_have_class(re.compile(r"\bis-playing\b"))
-            else:
-                expect(panel).not_to_have_class(re.compile(r"\bis-playing\b"))
-        self.page.wait_for_timeout(500)
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
         expect(toggle).to_have_attribute("aria-pressed", "false")
+        expect(panel).not_to_have_class(re.compile(r"\bis-playing\b"))
         self.assertTrue(self.page.locator("#bgMusic").evaluate("audio => audio.paused"))
         self.assert_no_runtime_errors()
 
-    def test_photo_playback_changes_track_and_stays_muted_after_closing(self):
-        requested_tracks = []
-
-        def available_preview(route):
-            self.external_requests.append(route.request.url)
-            track = urlparse(route.request.url).path.rsplit("/", 1)[-1]
-            requested_tracks.append(track)
-            callback = parse_qs(urlparse(route.request.url).query).get("callback", [""])[0]
-            self.assertRegex(callback, r"^surprisePreview_[A-Za-z0-9_]+$")
-            route.fulfill(
-                content_type="application/javascript",
-                body=f'{callback}({{"preview":"https://cdnt-preview.dzcdn.net/preview-{track}.mp3"}});',
-            )
-
+    def test_photo_music_requires_a_click_for_every_selected_memory(self):
         self.mock_immediate_playback()
-        self.page.route("https://api.deezer.com/**", available_preview)
+        requested_tracks = self.mock_available_previews()
         self.enter_quietly()
-        self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
-        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Tocando um trecho")
-        expect(self.page.locator(".shot").nth(0)).to_have_class(re.compile(r"\bplaying\b"))
-        self.page.locator("#photoNext").click()
-        expect(self.page.locator(".shot").nth(0)).not_to_have_class(re.compile(r"\bplaying\b"))
-        expect(self.page.locator(".shot").nth(1)).to_have_class(re.compile(r"\bplaying\b"))
         expected_tracks = self.page.locator(".shot img").evaluate_all(
             "images => images.slice(0, 2).map(image => image.dataset.trackId)"
         )
-        self.assertEqual(requested_tracks, expected_tracks, "Navigation must request the matching track.")
+        self.page.locator(".shot-button").first.click()
+        self.assertEqual(len(requested_tracks), 0, "Opening a photo must not request music.")
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Tocando um trecho")
+        expect(self.page.locator(".shot").nth(0)).to_have_class(re.compile(r"\bplaying\b"))
+        self.page.evaluate("""track => {
+            window.__firstPhotoAudio = __mediaMock.photo(track);
+            __mediaMock.setTime(__firstPhotoAudio, 8.25);
+        }""", expected_tracks[0])
+        self.assertFalse(self.page.evaluate("__firstPhotoAudio.loop"), "Photo excerpts must not loop.")
+        before_navigation = self.page.evaluate("__mediaMock.snapshot(__firstPhotoAudio)")
+        self.page.locator("#photoNext").click()
+        self.assertFalse(self.page.evaluate("__firstPhotoAudio.paused"), "Photo navigation must keep the active excerpt playing.")
+        self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__firstPhotoAudio).playCalls"),
+                         before_navigation["playCalls"], "Photo navigation must not restart the active excerpt.")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.assertEqual(requested_tracks, expected_tracks[:1], "Navigation must not start the next track.")
+        self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25)
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator(".shot").nth(1)).to_have_class(re.compile(r"\bplaying\b"))
+        self.assertEqual(requested_tracks, expected_tracks, "Each listen action must request the selected track.")
+        self.page.locator("#photoPrev").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator(".shot").nth(0)).to_have_class(re.compile(r"\bplaying\b"))
+        self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25,
+                         "Returning to an excerpt must resume its saved position.")
+        self.assertEqual(requested_tracks, expected_tracks, "A cached excerpt must not be fetched again.")
         self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
         self.page.keyboard.press("Escape")
         expect(self.page.locator(".photo-dialog")).not_to_be_visible()
         expect(self.page.locator(".shot-button").first).to_be_focused()
         expect(self.page.locator(".shot.playing")).to_have_count(0)
+        self.page.wait_for_function("__mediaMock.allPaused()")
         expect(self.page.locator(".audio-panel")).not_to_have_class(re.compile(r"\bis-playing\b"))
         self.assertTrue(self.page.locator("#bgMusic").evaluate("audio => audio.paused"))
         self.assert_no_runtime_errors()
 
     def test_late_audio_play_cannot_resume_after_muting(self):
-        self.page.add_init_script("""(() => {
-            const playing = new WeakSet();
-            window.__pendingPlayback = [];
-            Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
-                configurable: true, get() { return !playing.has(this); }
-            });
-            HTMLMediaElement.prototype.play = function () {
-                const audio = this;
-                return new Promise(resolve => {
-                    window.__pendingPlayback.push(() => {
-                        playing.add(audio);
-                        audio.dispatchEvent(new Event('playing'));
-                        resolve();
-                    });
-                });
-            };
-            HTMLMediaElement.prototype.pause = function () {
-                playing.delete(this);
-                this.dispatchEvent(new Event('pause'));
-            };
-        })();""")
+        self.mock_immediate_playback(deferred=True)
         self.enter_quietly()
         toggle = self.page.locator("#soundToggle")
         toggle.click()
@@ -409,6 +517,256 @@ class SiteTests(unittest.TestCase):
         expect(self.page.locator("#photoMusicStatus")).to_contain_text("Som desligado")
         self.page.keyboard.press("Escape")
         self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_background_continues_without_restarting_while_browsing_photos(self):
+        self.enter_with_mocked_music()
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 12.5)")
+        before = self.background_snapshot()
+        self.assertFalse(before["loop"], "The background excerpt must not loop.")
+        self.page.locator(".shot-button").first.click()
+        self.page.keyboard.press("ArrowRight")
+        self.page.keyboard.press("ArrowLeft")
+        self.page.keyboard.press("Escape")
+        after = self.background_snapshot()
+        self.assertFalse(after["paused"], "Photo browsing must keep the chosen background playing.")
+        self.assertEqual(after["currentTime"], before["currentTime"], "Photo browsing must not seek the background.")
+        self.assertEqual(after["playCalls"], before["playCalls"], "Photo browsing must not restart playback.")
+        self.assertEqual(after["pauseCalls"], before["pauseCalls"], "Photo browsing must not interrupt playback.")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_background_fades_progressively_and_resumes_its_saved_position(self):
+        self.enter_with_mocked_music()
+        self.page.wait_for_function("document.getElementById('bgMusic').volume >= 0.45")
+        values = [sample["value"] for sample in self.background_snapshot()["volumeSamples"]]
+        self.assertTrue(any(0 < value < 0.4 for value in values), "Starting music must include intermediate volumes.")
+        self.assertTrue(all(left <= right + 0.001 for left, right in zip(values, values[1:])),
+                        "The fade-in must increase volume smoothly.")
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 14.25)")
+        toggle = self.page.locator("#soundToggle")
+        toggle.click()
+        expect(toggle).to_have_attribute("aria-pressed", "false")
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
+        paused = self.background_snapshot()
+        self.assertEqual(paused["currentTime"], 14.25, "Pausing must preserve the playback position.")
+        self.assertLessEqual(paused["volume"], 0.01, "Pausing must finish its fade-out before stopping.")
+        toggle.click()
+        expect(toggle).to_have_attribute("aria-pressed", "true")
+        self.page.wait_for_function("document.getElementById('bgMusic').volume >= 0.45")
+        resumed = self.background_snapshot()
+        self.assertEqual(resumed["currentTime"], 14.25, "Resuming must continue from the saved position.")
+        self.assertEqual(resumed["playCalls"], paused["playCalls"] + 1)
+        self.assert_no_runtime_errors()
+
+    def test_finished_background_stays_finished_until_an_explicit_replay(self):
+        self.enter_with_mocked_music()
+        self.page.evaluate("__mediaMock.finish(__mediaMock.background())")
+        expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
+        finished = self.background_snapshot()
+        self.assertTrue(finished["ended"])
+        self.page.locator(".shot-button").first.click()
+        self.page.keyboard.press("ArrowRight")
+        self.page.keyboard.press("Escape")
+        self.page.evaluate("__mediaMock.setHidden(true); __mediaMock.setHidden(false)")
+        after_browsing = self.background_snapshot()
+        self.assertTrue(after_browsing["paused"], "Browsing and returning to the page must not replay an ended track.")
+        self.assertTrue(after_browsing["ended"])
+        self.assertEqual(after_browsing["currentTime"], finished["currentTime"])
+        self.assertEqual(after_browsing["playCalls"], finished["playCalls"])
+        self.page.locator("#musicPlayBtn").click()
+        expect(self.page.locator("#musicPlayBtn")).to_have_attribute("aria-pressed", "true")
+        replayed = self.background_snapshot()
+        self.assertEqual(replayed["currentTime"], 0, "An explicit replay may start the ended track from the beginning.")
+        self.assertEqual(replayed["playCalls"], finished["playCalls"] + 1)
+        self.assertFalse(replayed["ended"])
+        self.assert_no_runtime_errors()
+
+    def test_photo_music_continues_during_navigation_and_closing_restores_background_position(self):
+        requested_tracks = self.mock_available_previews()
+        self.enter_with_mocked_music()
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 16.75)")
+        self.page.locator(".shot-button").first.click()
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        track = self.page.locator(".shot img").first.get_attribute("data-track-id")
+        self.page.evaluate("track => { window.__activePhoto = __mediaMock.photo(track); }", track)
+        self.page.wait_for_function("document.getElementById('bgMusic').paused && __activePhoto.volume >= 0.6")
+        background = self.background_snapshot()
+        self.assertEqual(background["currentTime"], 16.75)
+        photo_values = self.page.evaluate("__mediaMock.snapshot(__activePhoto).volumeSamples.map(sample => sample.value)")
+        self.assertTrue(any(0 < value < 0.5 for value in photo_values), "Photo music must fade in rather than jump in volume.")
+        self.page.evaluate("__mediaMock.setTime(__activePhoto, 6.5)")
+        photo = self.page.evaluate("__mediaMock.snapshot(__activePhoto)")
+        self.page.locator("#photoNext").click()
+        self.assertFalse(self.page.evaluate("__activePhoto.paused"), "Navigation must preserve the currently chosen photo music.")
+        self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__activePhoto).playCalls"), photo["playCalls"])
+        self.assertEqual(self.page.evaluate("__activePhoto.currentTime"), 6.5)
+        self.assertEqual(requested_tracks, [track], "Navigation must not fetch or play the next photo track.")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.page.locator("#photoSoundToggle").click()
+        self.page.wait_for_function("__activePhoto.paused")
+        self.page.locator("#photoSoundToggle").click()
+        self.page.wait_for_function("!__activePhoto.paused && __activePhoto.volume > 0")
+        self.assertEqual(self.page.evaluate("__activePhoto.currentTime"), 6.5)
+        self.assertTrue(self.page.locator("#bgMusic").evaluate("audio => audio.paused"))
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_function("__activePhoto.paused && !document.getElementById('bgMusic').paused")
+        restored = self.background_snapshot()
+        self.assertEqual(restored["currentTime"], 16.75, "Closing a photo must resume the original background position.")
+        self.assert_no_runtime_errors()
+
+    def test_closing_photo_respects_an_explicitly_paused_background(self):
+        self.mock_available_previews()
+        self.enter_with_mocked_music()
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 11.25)")
+        self.page.locator("#musicPlayBtn").click()
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
+        paused_background = self.background_snapshot()
+        self.page.locator(".shot-button").first.click()
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
+        after_closing = self.background_snapshot()
+        self.assertEqual(after_closing["playCalls"], paused_background["playCalls"],
+                         "Closing a photo must respect the user's paused background choice.")
+        self.assertEqual(after_closing["currentTime"], 11.25)
+        self.assert_no_runtime_errors()
+
+    def test_finished_photo_does_not_loop_or_restart_the_background_on_its_own(self):
+        self.mock_available_previews()
+        self.enter_with_mocked_music()
+        self.page.locator(".shot-button").first.click()
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        track = self.page.locator(".shot img").first.get_attribute("data-track-id")
+        self.page.evaluate("track => { window.__finishedPhoto = __mediaMock.photo(track); }", track)
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
+        background = self.background_snapshot()
+        self.page.evaluate("__mediaMock.finish(__finishedPhoto)")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.page.wait_for_timeout(150)
+        self.assertTrue(self.page.evaluate("__finishedPhoto.paused && __finishedPhoto.ended && !__finishedPhoto.loop"))
+        self.assertTrue(self.background_snapshot()["paused"], "The end of a photo excerpt must stay quiet.")
+        self.assertEqual(self.background_snapshot()["playCalls"], background["playCalls"])
+        self.page.locator("#photoListenBtn").click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.assertEqual(self.page.evaluate("__finishedPhoto.currentTime"), 0,
+                         "An explicit listen action may replay an ended photo excerpt.")
+        self.assert_no_runtime_errors()
+
+    def test_hidden_page_pauses_immediately_and_cancels_unfinished_fades(self):
+        self.enter_with_mocked_music()
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 9.5)")
+        paused_immediately = self.page.evaluate("""() => {
+            __mediaMock.setHidden(true);
+            return __mediaMock.background().paused;
+        }""")
+        self.assertTrue(paused_immediately, "An inactive page must pause before another animation frame.")
+        expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
+        hidden = self.background_snapshot()
+        self.page.wait_for_timeout(1000)
+        still_hidden = self.background_snapshot()
+        self.assertTrue(still_hidden["paused"])
+        self.assertEqual(still_hidden["volume"], hidden["volume"], "A canceled fade must not keep changing volume.")
+        self.assertEqual(still_hidden["currentTime"], 9.5)
+        self.page.evaluate("__mediaMock.setHidden(false)")
+        expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "true")
+        self.assertEqual(self.background_snapshot()["currentTime"], 9.5)
+        self.page.evaluate("__mediaMock.setHidden(true)")
+        self.page.locator("#soundToggle").click()
+        muted = self.background_snapshot()
+        self.page.evaluate("__mediaMock.setHidden(false)")
+        self.page.wait_for_timeout(100)
+        self.assertTrue(self.background_snapshot()["paused"], "The last mute intention must survive a visibility change.")
+        self.assertEqual(self.background_snapshot()["playCalls"], muted["playCalls"])
+        self.assert_no_runtime_errors()
+
+    def test_an_older_play_promise_cannot_pause_a_newer_resume(self):
+        self.mock_immediate_playback(deferred=True)
+        self.enter_quietly()
+        toggle = self.page.locator("#soundToggle")
+        toggle.click()
+        self.page.wait_for_function("window.__pendingPlayback.length === 1")
+        toggle.click()
+        toggle.click()
+        self.page.wait_for_function("window.__pendingPlayback.length === 2")
+        self.page.evaluate("window.__pendingPlayback[1]()")
+        expect(toggle).to_have_attribute("aria-pressed", "true")
+        self.page.evaluate("window.__pendingPlayback[0]()")
+        self.page.wait_for_timeout(100)
+        self.assertFalse(self.background_snapshot()["paused"], "An older play completion must leave the newer request playing.")
+        expect(toggle).to_have_attribute("aria-pressed", "true")
+        toggle.click()
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
+        expect(toggle).to_have_attribute("aria-pressed", "false")
+        self.assert_no_runtime_errors()
+
+    def test_late_photo_preview_cannot_replace_music_after_the_dialog_closes(self):
+        def delayed_preview(route):
+            self.external_requests.append(route.request.url)
+            track = urlparse(route.request.url).path.rsplit("/", 1)[-1]
+            callback = parse_qs(urlparse(route.request.url).query).get("callback", [""])[0]
+            self.assertRegex(callback, r"^surprisePreview_[A-Za-z0-9_]+$")
+            route.fulfill(
+                content_type="application/javascript",
+                body=f'window.__deliverLatePreview = () => {callback}({{"preview":"https://cdnt-preview.dzcdn.net/preview-{track}.mp3"}});',
+            )
+
+        self.page.route("https://api.deezer.com/**", delayed_preview)
+        self.enter_with_mocked_music()
+        before = self.background_snapshot()
+        track = self.page.locator(".shot img").first.get_attribute("data-track-id")
+        self.page.locator(".shot-button").first.click()
+        self.page.locator("#photoListenBtn").click()
+        self.page.wait_for_function("typeof window.__deliverLatePreview === 'function'")
+        self.page.keyboard.press("Escape")
+        self.page.evaluate("window.__deliverLatePreview()")
+        self.page.wait_for_timeout(100)
+        no_photo_started = self.page.evaluate("track => !__mediaMock.photo(track)", track)
+        self.assertTrue(no_photo_started, "A canceled photo request must not start playback after closing.")
+        after = self.background_snapshot()
+        self.assertFalse(after["paused"])
+        self.assertEqual(after["playCalls"], before["playCalls"])
+        expect(self.page.locator(".shot.playing")).to_have_count(0)
+        self.assert_no_runtime_errors()
+
+    def test_keepsake_quotes_are_accessible_and_do_not_repeat_immediately(self):
+        self.enter_quietly()
+        button = self.page.locator("#keepsakeBtn")
+        quote = self.page.locator("#keepsakeText")
+        expect(button).to_have_attribute("aria-controls", "keepsakeText")
+        expect(quote).to_have_attribute("role", "status")
+        expect(quote).to_have_attribute("aria-live", "polite")
+        quote.evaluate("el => { window.__previousKeepsake = el.textContent.trim(); }")
+        button.focus()
+        for _ in range(10):
+            button.press("Enter")
+            changed = quote.evaluate("""el => {
+                const text = el.textContent.trim();
+                const changed = text.length > 0 && text !== window.__previousKeepsake;
+                window.__previousKeepsake = text;
+                return changed;
+            }""")
+            self.assertTrue(changed, "Each keepsake action must show a nonempty quote different from the previous one.")
+        expect(button).to_be_focused()
+        self.assert_no_runtime_errors()
+
+    def test_back_to_top_restores_focus_and_reading_progress_is_only_visual(self):
+        self.enter_quietly()
+        self.page.locator("#final").evaluate("el => el.scrollIntoView({behavior: 'instant'})")
+        self.page.wait_for_function("window.scrollY > 0")
+        top_link = self.page.locator("#backToTop")
+        expect(top_link).to_have_attribute("href", "#inicio")
+        top_link.click()
+        self.page.wait_for_function("window.scrollY <= 1")
+        expect(self.page.locator("h1")).to_be_focused()
+        progress = self.page.locator(".experience-progress")
+        expect(progress).to_have_attribute("aria-hidden", "true")
+        self.assertIsNone(progress.get_attribute("role"), "The decoration must not announce changing progress.")
+        self.assertIsNone(self.page.locator("#experienceProgress").get_attribute("role"))
         self.assert_no_runtime_errors()
 
 

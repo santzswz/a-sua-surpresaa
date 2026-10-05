@@ -7,7 +7,9 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 - Envelope de entrada com escolha de ouvir música ou entrar sem som.
 - Carta original, desejos de aniversário, linha do tempo e contador da nossa história.
 - Dez fotografias preservadas no próprio repositório; nove lembranças na galeria, com navegação por botões, teclado e deslize no celular.
-- Trecho de **Partilhar — Rubel** durante a leitura e uma trilha para cada foto. O site informa quando um serviço de música está indisponível e oferece links para ouvir a música completa.
+- Trecho de **Partilhar — Rubel** durante a leitura: continua ao abrir e navegar pelas fotos, conserva a posição ao pausar e tem transições suaves de volume. As músicas de cada foto entram apenas pelo seu player.
+- Os trechos são prévias de cerca de 30 segundos; terminam sem repetição automática. Os links levam à música completa nos serviços de origem.
+- Um potinho de carinho revela frases da carta original, sem repetir a anterior, e pequenos capítulos dão acesso às datas da história.
 - Presente com a brincadeira dos R$ 0,20 e a revelação dos R$ 300,00. Ocultar o saldo também oculta o valor na mensagem.
 - Recados secretos, foco visível, respeito à preferência por movimento reduzido e conteúdo acessível mesmo sem JavaScript.
 
@@ -16,7 +18,9 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 ```text
 index.html                 Conteúdo da surpresa
 assets/css/style.css       Layout e identidade visual
-assets/js/app.js           Interações e controle de áudio
+assets/js/app.js           Interações e integração dos players
+assets/js/audio-controller.js Continuidade, fades e estado de reprodução
+assets/js/details.js       Potinho de carinho e navegação de capítulos
 assets/js/date-utils.js    Cálculos de calendário no fuso UTC−03:00
 assets/photos/             As dez fotografias originais
 tests/                     Testes de datas e navegação no navegador
@@ -50,5 +54,7 @@ Se já houver um Chromium instalado, defina `CHROMIUM_PATH` com o caminho do exe
 O texto, as legendas e as músicas da galeria ficam em `index.html`. As datas de aniversário e início da história ficam em `assets/js/date-utils.js`; os valores do presente ficam em `assets/js/app.js`. As datas são calculadas em UTC−03:00 para que o contador permaneça consistente ao abrir o site em outro fuso.
 
 Os controles de saldo fazem parte da brincadeira visual: o site é público, e o valor também pode ser encontrado no código. Preserve os arquivos de fotos ao editar o projeto.
+
+O áudio começa apenas por uma ação da pessoa. A trilha de fundo continua ao visitar a galeria; uma música de foto substitui a anterior com fade quando seu trecho fica pronto. Cada faixa conserva sua posição nesta visita. O fim da prévia só pode ser reiniciado pelo player, nunca por navegar pelas fotos. O áudio é pausado imediatamente quando a aba fica oculta. Os fades usam o volume nativo, conforme o suporte do navegador. No iOS, onde o volume pode ser controlado apenas pelo sistema, a troca é sequencial para evitar duas músicas tocando juntas.
 
 O workflow de verificação executa os testes em pull requests e em alterações de `main`. A publicação continua usando a configuração existente do GitHub Pages.

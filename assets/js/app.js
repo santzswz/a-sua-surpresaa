@@ -63,13 +63,8 @@
   scheduleCounters();
 
   const background = byId('bgMusic');
-  const photoAudio = new Audio();
-  photoAudio.preload = 'none';
-  photoAudio.loop = true;
-  // Native media playback needs no Web Audio graph or cross-origin permission.
-  background?.removeAttribute('crossorigin');
-  const media = { background, photo: photoAudio };
   const soundToggle = byId('soundToggle');
+  const photoSoundToggle = byId('photoSoundToggle');
   const musicPlayButton = byId('musicPlayBtn');
   const musicStatus = byId('musicStatus');
   const photoListenButton = byId('photoListenBtn');
@@ -84,98 +79,99 @@
   let opened = false;
   let photoIndex = -1;
   let lastPhotoIndex = -1;
-  let revision = 0;
-  let target = null;
-  let state = 'idle';
-  let statusMessage = '';
+  let photoRevision = 0;
   let pendingPreview = null;
-  let playbackTimeout = null;
+  let photoRequestState = 'idle';
   const previewCache = new Map();
+  let audioState = { desired: false, target: null, state: 'idle', playing: false,
+    backgroundPlaying: false, photoPlaying: false, backgroundState: 'idle' };
+  const audioController = window.SurpriseAudio?.createController({
+    background,
+    sequentialTransitions: /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1),
+    onChange: snapshot => { audioState = snapshot; renderAudio(); }
+  });
+  if (audioController) audioState = audioController.getState();
 
   function renderAudio() {
-    const playing = Boolean(state === 'playing' && target && !media[target]?.paused);
-    const loading = state === 'loading';
+    const playing = Boolean(enabled && audioState.playing);
+    const loading = enabled && (audioState.state === 'loading' || photoRequestState === 'loading');
     soundToggle?.classList.toggle('muted', !playing);
     soundToggle?.setAttribute('aria-pressed', String(playing));
     soundToggle?.setAttribute('aria-label', playing || loading ? 'Pausar música' : 'Ativar música');
     soundToggle?.setAttribute('title', playing ? 'Som ligado' : loading ? 'Preparando música' : 'Som pausado');
-    const backgroundPlaying = playing && target === 'background';
+    photoSoundToggle?.setAttribute('aria-pressed', String(playing));
+    photoSoundToggle?.setAttribute('aria-label', playing || loading ? 'Pausar música' : 'Ativar música');
+    if (photoSoundToggle) photoSoundToggle.textContent = playing || loading ? 'Pausar música' : 'Ativar música';
+    const backgroundPlaying = Boolean(enabled && audioState.backgroundPlaying);
+    const backgroundEnded = audioState.backgroundState === 'ended';
     musicPlayButton?.setAttribute('aria-pressed', String(backgroundPlaying));
-    musicPlayButton?.setAttribute('aria-label', backgroundPlaying ? 'Pausar Partilhar' : 'Reproduzir Partilhar');
+    musicPlayButton?.setAttribute('aria-label', backgroundPlaying ? 'Pausar Partilhar'
+      : backgroundEnded ? 'Ouvir o trecho de Partilhar novamente' : 'Continuar Partilhar');
     if (musicPlayButton) musicPlayButton.textContent = backgroundPlaying ? 'Ⅱ' : '▶︎';
     document.querySelector('.audio-panel')?.classList.toggle('is-playing', backgroundPlaying);
-    if (musicStatus) musicStatus.textContent = target === 'background'
-      ? backgroundPlaying ? 'Tocando um trecho de Partilhar.' : state === 'loading' ? 'Preparando a nossa trilha…' : statusMessage || 'Música pausada. Toque em ▶︎ para ouvir.'
-      : photoIndex >= 0 ? 'A nossa trilha fica pausada enquanto você visita as fotos.' : 'Música pausada. Toque em ▶︎ para ouvir.';
-    const photoPlaying = playing && target === 'photo';
+    if (musicStatus) musicStatus.textContent = backgroundPlaying ? 'Tocando um trecho de Partilhar, sem repetir.'
+      : backgroundEnded ? 'O trecho chegou ao fim. Você pode ouvir a música completa pelo link abaixo.'
+      : audioState.backgroundError ? audioState.backgroundError === 'blocked'
+        ? 'Toque em ▶︎ para permitir a reprodução deste trecho.'
+        : 'Não foi possível tocar a trilha. Você pode ouvir a música completa pelo link abaixo.'
+      : audioState.target === 'background' && audioState.state === 'loading' ? 'Preparando a nossa trilha…'
+      : audioState.target === 'photo' && enabled ? 'A trilha está pausada enquanto você ouve esta lembrança.'
+      : 'Música pausada. Toque em ▶︎ para continuar.';
+    const selectedTrack = photos[photoIndex]?.image.dataset.trackId;
+    const selectedAudio = audioState.target === 'photo' && audioState.trackId === selectedTrack;
+    const photoPlaying = Boolean(enabled && selectedAudio && audioState.photoPlaying);
     photoListenButton?.setAttribute('aria-pressed', String(photoPlaying));
-    photoListenButton?.setAttribute('aria-label', photoPlaying ? 'Pausar música da foto' : 'Reproduzir música da foto');
+    photoListenButton?.setAttribute('aria-label', photoPlaying ? 'Pausar música da foto'
+      : selectedAudio && audioState.state === 'ended' ? 'Ouvir o trecho da foto novamente' : 'Continuar música da foto');
     if (photoListenButton) photoListenButton.textContent = photoPlaying ? 'Ⅱ' : '▶︎';
-    if (photoMusicStatus) photoMusicStatus.textContent = target === 'photo'
-      ? photoPlaying ? 'Tocando um trecho desta lembrança.' : state === 'loading' ? 'Preparando o trecho…' : statusMessage || 'Trecho pausado. Toque em ▶︎ para ouvir.'
-      : enabled ? 'Toque em ▶︎ para ouvir um trecho.' : 'Som desligado. Toque em ▶︎ para ouvir um trecho.';
-    photos.forEach((photo, index) => photo.figure.classList.toggle('playing', photoPlaying && index === photoIndex));
+    if (photoMusicStatus) photoMusicStatus.textContent = photoRequestState === 'loading' ? 'Preparando o trecho…'
+      : photoRequestState === 'error' || (selectedAudio && audioState.error === 'unavailable')
+        ? 'O trecho está indisponível. Você ainda pode ouvir a música completa.'
+      : selectedAudio && audioState.error === 'blocked' ? 'Toque em ▶︎ para permitir a reprodução deste trecho.'
+      : photoPlaying ? 'Tocando um trecho desta lembrança, sem repetir.'
+      : selectedAudio && audioState.state === 'loading' ? 'Preparando o trecho…'
+      : selectedAudio && audioState.state === 'ended' ? 'O trecho terminou. Toque em ▶︎ para ouvir novamente.'
+      : !enabled ? 'Som desligado. Toque em ▶︎ para ouvir um trecho.'
+      : backgroundPlaying ? 'A nossa trilha continua. Toque em ▶︎ para ouvir esta lembrança.'
+      : enabled && audioState.photoPlaying && !selectedAudio ? 'A música anterior continua. Toque em ▶︎ para ouvir esta lembrança.'
+      : 'Toque em ▶︎ para continuar o trecho desta lembrança.';
+    photos.forEach(photo => photo.figure.classList.toggle('playing', enabled && audioState.photoPlaying
+      && photo.image.dataset.trackId === audioState.trackId));
+    const duration = audioState.backgroundDuration;
+    const elapsed = audioState.backgroundTime || 0;
+    const clock = seconds => `${Math.floor(seconds / 60)}:${pad(Math.floor(seconds % 60))}`;
+    setText('musicElapsed', clock(elapsed));
+    setText('musicDuration', Number.isFinite(duration) && duration > 0 ? clock(duration) : '—:—');
+    const fill = byId('musicProgressFill');
+    if (fill) fill.style.width = `${Number.isFinite(duration) && duration > 0 ? Math.min(100, elapsed / duration * 100) : 0}%`;
   }
-  function stopAudio() {
-    revision += 1;
+  function cancelPhotoRequest() {
+    photoRevision += 1;
     pendingPreview?.cancel();
     pendingPreview = null;
-    clearTimeout(playbackTimeout);
-    playbackTimeout = null;
-    Object.values(media).forEach(audio => audio?.pause());
-    target = null;
-    state = 'idle';
-    statusMessage = '';
+    photoRequestState = 'idle';
+  }
+  function stopAudio({ immediate = false } = {}) {
+    cancelPhotoRequest();
+    enabled = false;
+    audioController?.pause({ immediate });
     renderAudio();
   }
-  function beginAudio(kind) {
-    stopAudio();
-    target = kind;
-    state = 'loading';
-    renderAudio();
-    return revision;
-  }
-  function failAudio(message, token) {
-    if (token !== revision) return;
-    revision += 1;
-    clearTimeout(playbackTimeout);
-    media[target]?.pause();
-    state = 'error';
-    statusMessage = message;
+  function playBackground({ explicit = false } = {}) {
+    if (!enabled || !backgroundWanted || !opened || document.hidden) return;
+    cancelPhotoRequest();
+    void audioController?.playBackground({ explicit });
     renderAudio();
   }
-  function startPlaybackTimeout(token) {
-    clearTimeout(playbackTimeout);
-    playbackTimeout = setTimeout(() => failAudio(target === 'photo'
-      ? 'O trecho está indisponível. Você ainda pode ouvir a música completa.'
-      : 'A trilha está indisponível agora. Você pode ouvir a música completa pelo link abaixo.', token), 12000);
-  }
-  async function playMedia(kind, token) {
-    if (token !== revision || !enabled || document.hidden) return;
-    const audio = media[kind];
-    if (!audio) return failAudio('A música está indisponível neste navegador.', token);
-    try {
-      audio.volume = kind === 'background' ? 0.48 : 0.65;
-      startPlaybackTimeout(token);
-      await audio.play();
-      if (token !== revision) {
-        // A canceled play promise may still start the element in some browsers.
-        // Keep a newer request on this same element intact, but stop stale audio.
-        if (target !== kind || !enabled || document.hidden || state === 'error') audio.pause();
-        return;
-      }
-      clearTimeout(playbackTimeout);
-      state = 'playing';
-      renderAudio();
-    } catch (error) {
-      if (token !== revision) return;
-      failAudio(error?.name === 'NotAllowedError' ? 'Toque em ▶︎ para permitir a reprodução deste trecho.'
-        : 'Não foi possível tocar o trecho. Você pode ouvir a música completa pelo link.', token);
+  // Looking at another photo never restarts or replaces the background track.
+  function handlePhotoNavigation({ closing = false } = {}) {
+    cancelPhotoRequest();
+    if (closing && enabled && audioState.target === 'photo') {
+      if (backgroundWanted) playBackground();
+      else stopAudio();
     }
-  }
-  function playBackground() {
-    if (!enabled || !backgroundWanted || !opened || photoIndex >= 0 || document.hidden) return;
-    void playMedia('background', beginAudio('background'));
+    renderAudio();
   }
   function validPreview(value) {
     try {
@@ -237,64 +233,50 @@
     } };
   }
   async function playPhoto() {
-    if (photoIndex < 0 || !enabled || document.hidden) return;
+    if (photoIndex < 0 || document.hidden) return;
+    cancelPhotoRequest();
+    enabled = true;
+    photoRequestState = 'loading';
     const photo = photos[photoIndex];
-    const token = beginAudio('photo');
+    const token = photoRevision;
     const request = loadPreview(photo.image.dataset.trackId);
     pendingPreview = request;
+    renderAudio();
     try {
       const preview = await request.promise;
-      if (token !== revision || photoIndex < 0 || !enabled) return;
+      if (token !== photoRevision || photoIndex < 0 || !enabled || document.hidden) return;
       pendingPreview = null;
-      if (photoAudio.src !== preview) photoAudio.src = preview;
-      photoAudio.currentTime = 0;
-      await playMedia('photo', token);
+      photoRequestState = 'idle';
+      if (!audioController) throw new Error('Audio unavailable');
+      await audioController.playPhoto(photo.image.dataset.trackId, preview, { explicit: true });
     } catch {
-      if (token !== revision) return;
+      if (token !== photoRevision) return;
       pendingPreview = null;
-      failAudio('O trecho está indisponível. Você ainda pode ouvir a música completa.', token);
+      photoRequestState = 'error';
     }
+    renderAudio();
   }
-  Object.entries(media).forEach(([kind, audio]) => {
-    if (!audio) return;
-    audio.addEventListener('playing', () => {
-      if (target !== kind || !enabled || document.hidden || state === 'error') { audio.pause(); return; }
-      clearTimeout(playbackTimeout);
-      state = 'playing';
-      renderAudio();
-    });
-    audio.addEventListener('waiting', () => {
-      if (target !== kind || !enabled || state === 'error') return;
-      state = 'loading';
-      startPlaybackTimeout(revision);
-      renderAudio();
-    });
-    audio.addEventListener('error', () => {
-      if (target !== kind) return;
-      failAudio(kind === 'photo' ? 'O trecho está indisponível. Você ainda pode ouvir a música completa.'
-        : 'Não foi possível tocar a trilha. Você pode ouvir a música completa pelo link abaixo.', revision);
-    });
-    audio.addEventListener('pause', () => {
-      if (target === kind && audio.paused && state === 'playing') { state = 'idle'; statusMessage = ''; }
-      renderAudio();
-    });
-  });
-  soundToggle?.addEventListener('click', () => {
-    if (enabled && (state === 'loading' || state === 'playing')) { enabled = false; stopAudio(); }
+  function toggleSound() {
+    if (enabled && (audioState.playing || audioState.state === 'loading' || photoRequestState === 'loading'
+      || (audioState.suspended && audioState.desired))) stopAudio();
     else {
       enabled = true;
-      if (photoIndex >= 0) void playPhoto();
-      else { backgroundWanted = true; playBackground(); }
+      if (photoIndex >= 0 && audioState.target === 'photo') void audioController?.resume({ explicit: true });
+      else { backgroundWanted = true; playBackground({ explicit: true }); }
     }
-  });
+  }
+  soundToggle?.addEventListener('click', toggleSound);
+  photoSoundToggle?.addEventListener('click', toggleSound);
   musicPlayButton?.addEventListener('click', () => {
-    if (target === 'background' && (state === 'playing' || state === 'loading')) {
-      enabled = false; backgroundWanted = false; stopAudio();
-    } else { enabled = true; backgroundWanted = true; playBackground(); }
+    if (enabled && (audioState.backgroundPlaying || (audioState.target === 'background' && audioState.state === 'loading'))) {
+      backgroundWanted = false;
+      stopAudio();
+    } else { enabled = true; backgroundWanted = true; playBackground({ explicit: true }); }
   });
   photoListenButton?.addEventListener('click', () => {
-    if (target === 'photo' && (state === 'playing' || state === 'loading')) { enabled = false; stopAudio(); }
-    else { enabled = true; void playPhoto(); }
+    const selected = audioState.target === 'photo' && audioState.trackId === photos[photoIndex]?.image.dataset.trackId;
+    if (enabled && (photoRequestState === 'loading' || (selected && ['playing', 'loading'].includes(audioState.state)))) stopAudio();
+    else void playPhoto();
   });
 
   let photoTrigger = null;
@@ -319,7 +301,7 @@
     photoIndex = (index + photos.length) % photos.length;
     lastPhotoIndex = photoIndex;
     const photo = photos[photoIndex];
-    stopAudio();
+    handlePhotoNavigation();
     const image = byId('modalImg');
     if (image) { image.src = photo.image.currentSrc || photo.image.src; image.alt = photo.image.alt; }
     setText('photoCaption', photo.caption || photo.image.alt);
@@ -336,20 +318,16 @@
     }
     if (!photoDialog.open) { lockPage(); photoDialog.showModal(); }
     renderAudio();
-    if (enabled) void playPhoto();
   }
   function finishPhoto() {
     if (photoIndex < 0) return;
     photoIndex = -1;
-    stopAudio();
-    photoAudio.removeAttribute('src');
-    photoAudio.load();
+    handlePhotoNavigation({ closing: true });
     byId('modalImg')?.removeAttribute('src');
     unlockPage();
     const trigger = photoTrigger;
     photoTrigger = null;
     requestAnimationFrame(() => { if (!photoDialog?.open) trigger?.focus({ preventScroll: true }); });
-    playBackground();
   }
   function closePhoto() { photoDialog?.close(); finishPhoto(); }
   document.querySelector('.gallery')?.addEventListener('click', event => {
@@ -508,10 +486,12 @@
   scheduleProgress();
   document.addEventListener('visibilitychange', () => {
     scheduleCounters();
-    if (document.hidden) stopAudio();
-    else if (enabled) { if (photoIndex >= 0) void playPhoto(); else playBackground(); }
+    if (document.hidden) { cancelPhotoRequest(); audioController?.suspend(); }
+    else if (enabled) void audioController?.resumeFromSuspension();
+    else audioController?.resumeFromSuspension();
   });
-  window.addEventListener('pagehide', stopAudio);
+  window.addEventListener('pagehide', () => { cancelPhotoRequest(); audioController?.suspend(); });
+  window.addEventListener('pageshow', event => { if (event.persisted) void audioController?.resumeFromSuspension(); });
   renderAudio();
   if (entryGate && typeof entryGate.showModal === 'function') { lockPage(); entryGate.showModal(); }
   else opened = true;

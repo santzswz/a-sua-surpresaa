@@ -25,5 +25,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
       - run: node --check assets/js/app.js
+      - run: node --check assets/js/audio-controller.js
+      - run: node --check assets/js/details.js
       - run: node --test tests/*.test.cjs
       - run: python -m unittest discover -s tests -p 'test_*.py' -v
