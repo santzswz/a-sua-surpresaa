@@ -131,7 +131,8 @@ class FakeMedia extends EventTarget {
   }
 }
 
-function fixture({ deferred = false, sequentialTransitions = false, volumeUnsupported = false } = {}) {
+function fixture({ deferred = false, sequentialTransitions = false, volumeUnsupported = false,
+  backgroundGain = false, makeAudioContext } = {}) {
   const clock = new Clock();
   const background = new FakeMedia(clock, deferred);
   const photos = [];
@@ -147,6 +148,8 @@ function fixture({ deferred = false, sequentialTransitions = false, volumeUnsupp
   const controller = createController({
     background,
     sequentialTransitions,
+    backgroundGain,
+    ...(makeAudioContext ? { makeAudioContext } : {}),
     makeAudio: () => {
       const audio = new FakeMedia(clock, deferred);
       photos.push(audio);
@@ -423,4 +426,270 @@ test('media-error retry reloads and restores position while permission retry doe
   blocked.clock.advance(900);
   assert.equal(blocked.background.paused, false);
   assert.deepEqual(blocked.background.seeks, [6.5]);
+});
+
+function contextFixture(failures = {}) {
+  const contexts = [];
+  const trace = [];
+  const makeAudioContext = () => {
+    if (failures.construction) throw new Error('Audio context unavailable');
+    const context = {
+      state: 'suspended', currentTime: 0, destination: {}, sourceCalls: 0,
+      resumeCalls: 0, closeCalls: 0, directConnections: 0, samples: [],
+      createGain() {
+        const parameter = {
+          value: 1,
+          setValueAtTime(value) {
+            if (failures.gainWrite) throw new Error('Gain update unavailable');
+            this.value = value;
+            context.samples.push({ value });
+          }
+        };
+        context.gainNode = {
+          gain: parameter,
+          connect() { if (failures.destination) throw new Error('Destination unavailable'); },
+          disconnect() {}
+        };
+        return context.gainNode;
+      },
+      createMediaElementSource(audio) {
+        context.sourceCalls += 1;
+        assert.equal(context.sourceCalls, 1, 'A media element can only be attached once.');
+        context.audio = audio;
+        return {
+          connect(target) {
+            if (target === context.destination) {
+              if (failures.direct) throw new Error('Direct output unavailable');
+              context.directConnections += 1;
+            } else if (failures.sourceGain) throw new Error('Gain connection unavailable');
+          },
+          disconnect() {}
+        };
+      },
+      resume() {
+        context.resumeCalls += 1;
+        trace.push('context.resume');
+        if (failures.resume) return Promise.reject(Object.assign(new Error('Gesture required'), {
+          name: 'NotAllowedError'
+        }));
+        if (failures.deferredResume) return new Promise(resolve => {
+          context.finishResume = () => { context.state = 'running'; resolve(); };
+        });
+        context.state = 'running';
+        return Promise.resolve();
+      },
+      close() { context.closeCalls += 1; context.state = 'closed'; return Promise.resolve(); }
+    };
+    contexts.push(context);
+    return context;
+  };
+  const media = fixture({ backgroundGain: true, makeAudioContext,
+    sequentialTransitions: true, volumeUnsupported: true });
+  return { ...media, contexts, trace, failures };
+}
+
+test('local background gain is lazy, begins at zero and fades on hardware-volume platforms', async () => {
+  const { controller, background, clock, contexts, trace } = contextFixture();
+  assert.equal(contexts.length, 0, 'No context should exist before a playback gesture.');
+  background.beforePlay = () => {
+    trace.push('media.play');
+    near(contexts[0].gainNode.gain.value, 0);
+    assert.equal(contexts[0].audio, background);
+  };
+  assert.equal(await controller.playBackground({ explicit: true }), true);
+  const context = contexts[0];
+  assert.deepEqual(trace, ['context.resume', 'media.play']);
+  near(context.gainNode.gain.value, 0);
+  clock.advance(450);
+  near(context.gainNode.gain.value, 0.24);
+  clock.advance(450);
+  near(context.gainNode.gain.value, 0.48);
+  assert.equal(background.volume, 1, 'Gain is applied once, outside hardware-controlled media volume.');
+  monotonic(context.samples, true);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  controller.destroy();
+  assert.equal(context.closeCalls, 1);
+});
+
+test('gain pause and suspension preserve position and reuse the source when the context resumes', async () => {
+  const { controller, background, clock, contexts } = contextFixture();
+  await controller.playBackground();
+  clock.advance(900);
+  const context = contexts[0];
+  background.currentTime = 18.5;
+  controller.pause();
+  clock.advance(175);
+  near(context.gainNode.gain.value, 0.24);
+  assert.equal(background.paused, false);
+  clock.advance(175);
+  near(context.gainNode.gain.value, 0);
+  assert.equal(background.paused, true);
+  context.state = 'suspended';
+  await controller.resume();
+  clock.advance(900);
+  near(context.gainNode.gain.value, 0.48);
+  assert.equal(context.resumeCalls, 2);
+  assert.equal(background.currentTime, 18.5);
+  controller.suspend();
+  near(context.gainNode.gain.value, 0);
+  assert.equal(background.paused, true);
+  context.state = 'suspended';
+  await controller.resumeFromSuspension();
+  clock.advance(900);
+  assert.equal(context.resumeCalls, 3);
+  assert.equal(context.sourceCalls, 1);
+  assert.equal(contexts.length, 1);
+  assert.deepEqual(background.seeks, [18.5]);
+  controller.destroy();
+});
+
+test('a full-length background uses the gain node for its tail and waits for explicit replay', async () => {
+  const { controller, background, clock, contexts } = contextFixture();
+  background.duration = 290.325;
+  await controller.playBackground();
+  clock.advance(900);
+  const context = contexts[0];
+  background.currentTime = background.duration - 0.75;
+  background.dispatchEvent(new Event('timeupdate'));
+  near(context.gainNode.gain.value, 0.24);
+  background.finish();
+  near(context.gainNode.gain.value, 0);
+  assert.equal(await controller.playBackground(), false);
+  assert.equal(background.playCalls, 1);
+  background.beforePlay = () => assert.equal(background.currentTime, 0);
+  assert.equal(await controller.playBackground({ explicit: true }), true);
+  assert.equal(context.sourceCalls, 1);
+  clock.advance(900);
+  near(context.gainNode.gain.value, 0.48);
+  controller.destroy();
+});
+
+test('remote photos stay native and iOS transitions pause outgoing media before playing', async () => {
+  const { controller, background, photos, clock, contexts, playbackStarts } = contextFixture();
+  await controller.playPhoto('remote', 'preview-remote', { explicit: true });
+  assert.equal(contexts.length, 0, 'A third-party preview must not create a Web Audio context.');
+  await controller.playBackground();
+  clock.advance(900);
+  assert.equal(photos[0].paused, true);
+  near(contexts[0].gainNode.gain.value, 0.48);
+  await controller.playPhoto('remote', 'preview-remote');
+  assert.equal(background.paused, true);
+  near(contexts[0].gainNode.gain.value, 0);
+  assert.equal(photos[0].paused, false);
+  assert.equal(contexts[0].sourceCalls, 1);
+  assert.ok(playbackStarts.every(start => start.activeCount === 0));
+  controller.destroy();
+});
+
+test('unavailable context and destination construction retain native playback', async () => {
+  const absent = fixture({ backgroundGain: true, makeAudioContext: () => null });
+  assert.equal(await absent.controller.playBackground(), true);
+  absent.clock.advance(900);
+  near(absent.background.volume, 0.48);
+  absent.controller.destroy();
+
+  const failed = contextFixture({ destination: true });
+  assert.equal(await failed.controller.playBackground(), true);
+  assert.equal(failed.contexts[0].sourceCalls, 0,
+    'An incomplete destination must not capture the media element.');
+  assert.equal(failed.contexts[0].closeCalls, 1);
+  assert.equal(failed.background.paused, false);
+  assert.equal(failed.controller.getState().backgroundPlaying, true);
+  failed.controller.destroy();
+});
+
+test('a failed gain connection keeps attached media audible through a direct route', async () => {
+  const { controller, contexts, background } = contextFixture({ sourceGain: true });
+  assert.equal(await controller.playBackground(), true);
+  const context = contexts[0];
+  assert.equal(context.sourceCalls, 1);
+  assert.equal(context.directConnections, 1);
+  assert.equal(background.paused, false);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  controller.pause({ immediate: true });
+  await controller.resume();
+  assert.equal(context.sourceCalls, 1);
+  assert.equal(context.directConnections, 1);
+  controller.destroy();
+});
+
+test('context permission failure is recoverable and does not misreport silent playback', async () => {
+  const { controller, contexts, background, failures, clock } = contextFixture({ resume: true });
+  assert.equal(await controller.playBackground(), false);
+  assert.equal(controller.getState().error, 'blocked');
+  assert.equal(controller.getState().playing, false);
+  assert.equal(background.paused, true);
+  near(contexts[0].gainNode.gain.value, 0);
+  failures.resume = false;
+  assert.equal(await controller.playBackground({ explicit: true }), true);
+  assert.equal(contexts[0].sourceCalls, 1);
+  assert.equal(background.loadCalls, 0, 'Output permission failure must not discard media position.');
+  clock.advance(900);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  controller.destroy();
+});
+
+test('a late context resume cannot revive media after mute', async () => {
+  const { controller, contexts, background, clock } = contextFixture({ deferredResume: true });
+  const playback = controller.playBackground();
+  assert.equal(controller.getState().state, 'loading');
+  assert.equal(controller.getState().playing, false);
+  controller.pause({ immediate: true });
+  contexts[0].finishResume();
+  assert.equal(await playback, false);
+  clock.advance(1000);
+  assert.equal(background.paused, true);
+  near(contexts[0].gainNode.gain.value, 0);
+  assert.equal(controller.getState().desired, false);
+  controller.destroy();
+});
+
+test('a gain update failure reroutes attached media without throwing from the animation frame', async () => {
+  const { controller, contexts, clock, failures, background } = contextFixture();
+  await controller.playBackground();
+  clock.advance(900);
+  failures.gainWrite = true;
+  assert.doesNotThrow(() => clock.advance(25));
+  assert.equal(contexts[0].directConnections, 1);
+  assert.equal(background.paused, false);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  controller.destroy();
+});
+
+test('a completely unavailable output reports an error and never claims silent playback', async () => {
+  const { controller, contexts, failures, clock, background } = contextFixture();
+  await controller.playBackground();
+  clock.advance(900);
+  failures.gainWrite = true;
+  failures.direct = true;
+  assert.doesNotThrow(() => clock.advance(25));
+  assert.equal(contexts[0].sourceCalls, 1);
+  assert.equal(controller.getState().state, 'error');
+  assert.equal(controller.getState().error, 'unavailable');
+  assert.equal(controller.getState().playing, false);
+  assert.equal(background.paused, true);
+  controller.destroy();
+});
+
+test('an interrupted context that never resumes times out even while media remains unpaused', async () => {
+  const { controller, contexts, failures, clock, background } = contextFixture();
+  await controller.playBackground();
+  clock.advance(900);
+  background.currentTime = 24.5;
+  contexts[0].state = 'suspended';
+  failures.deferredResume = true;
+  const resumed = controller.playBackground();
+  assert.equal(controller.getState().state, 'loading');
+  assert.equal(background.paused, false);
+  clock.advance(12000);
+  assert.equal(controller.getState().state, 'error');
+  assert.equal(controller.getState().error, 'unavailable');
+  assert.equal(controller.getState().playing, false);
+  assert.equal(background.paused, true);
+  near(contexts[0].gainNode.gain.value, 0);
+  contexts[0].finishResume();
+  assert.equal(await resumed, false, 'Late recovery must not undo the timeout.');
+  assert.equal(background.paused, true);
+  assert.equal(background.currentTime, 24.5);
+  controller.destroy();
 });
