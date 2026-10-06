@@ -1206,5 +1206,115 @@ class SiteTests(unittest.TestCase):
         self.assert_no_runtime_errors()
 
 
+    def test_final_surprise_envelope_toggles_by_keyboard_and_preserves_photo_order(self):
+        self.enter_quietly()
+        envelope = self.page.locator("#finalSurpriseEnvelope")
+        summary = envelope.locator(":scope > summary")
+        body = envelope.locator(":scope > .final-surprise-body")
+        self.assertTrue(envelope.evaluate("element => element instanceof HTMLDetailsElement"))
+        self.assertFalse(envelope.evaluate("element => element.open"))
+        expect(body).not_to_be_visible()
+        self.assertTrue(envelope.evaluate("""element => {
+            const final = document.querySelector('#final');
+            return Boolean(final && final.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }"""), "The extra envelope must appear after the existing final chapter.")
+        summary.focus()
+        summary.press("Enter")
+        expect(envelope).to_have_attribute("open", "")
+        expect(body).to_be_visible()
+        images = envelope.locator(".final-surprise-photo > img")
+        expect(images).to_have_count(3)
+        filenames = images.evaluate_all(r"""elements => elements.map(image => {
+            const pathname = new URL(image.currentSrc || image.src).pathname;
+            return pathname.split('/').pop().replace(/\.[^.]+$/, '');
+        })""")
+        self.assertEqual(filenames, ["final-surprise-01", "final-surprise-02", "final-surprise-03"])
+        summary.focus()
+        summary.press("Space")
+        self.assertFalse(envelope.evaluate("element => element.open"))
+        expect(body).not_to_be_visible()
+        expect(summary).to_be_focused()
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_final_surprise_photos_open_and_load_without_javascript(self):
+        page = self.new_page(java_script_enabled=False)
+        page.goto(self.base_url + "/", wait_until="load")
+        envelope = page.locator("#finalSurpriseEnvelope")
+        summary = envelope.locator(":scope > summary")
+        body = envelope.locator(":scope > .final-surprise-body")
+        self.assertFalse(envelope.evaluate("element => element.open"))
+        expect(body).not_to_be_visible()
+        summary.focus()
+        summary.press("Enter")
+        expect(envelope).to_have_attribute("open", "")
+        expect(body).to_be_visible()
+        images = envelope.locator(".final-surprise-photo > img")
+        expect(images).to_have_count(3)
+        for index in range(3):
+            with self.subTest(photo=index + 1):
+                image = images.nth(index)
+                image.scroll_into_view_if_needed()
+                page.wait_for_function(
+                    "image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0",
+                    arg=image.element_handle(),
+                )
+                expect(image).to_be_visible()
+        summary.click()
+        self.assertFalse(envelope.evaluate("element => element.open"))
+        expect(body).not_to_be_visible()
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_final_surprise_fits_a_phone_without_cropping_or_interrupting_music(self):
+        self.page.set_viewport_size({"width": 320, "height": 720})
+        self.enter_with_mocked_music(background_duration=290.325)
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 52.5)")
+        before = self.background_snapshot()
+        envelope = self.page.locator("#finalSurpriseEnvelope")
+        summary = envelope.locator(":scope > summary")
+        summary.focus()
+        summary.press("Enter")
+        expect(envelope).to_have_attribute("open", "")
+        images = envelope.locator(".final-surprise-photo > img")
+        expect(images).to_have_count(3)
+        for index in range(3):
+            with self.subTest(photo=index + 1):
+                image = images.nth(index)
+                image.scroll_into_view_if_needed()
+                self.page.wait_for_function(
+                    "image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0",
+                    arg=image.element_handle(),
+                )
+                fully_shown = image.evaluate("""image => {
+                    const rect = image.getBoundingClientRect();
+                    const intrinsicHeight = rect.width * image.naturalHeight / image.naturalWidth;
+                    if (rect.width <= 0 || rect.height <= 0 || rect.left < -1 || rect.right > innerWidth + 1
+                        || Math.abs(rect.height - intrinsicHeight) > 1.5) return false;
+                    for (let parent = image.parentElement; parent; parent = parent.parentElement) {
+                        const style = getComputedStyle(parent);
+                        const bounds = parent.getBoundingClientRect();
+                        if (['hidden', 'clip'].includes(style.overflowX)
+                            && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1)) return false;
+                        if (['hidden', 'clip'].includes(style.overflowY)
+                            && (rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1)) return false;
+                        if (parent.id === 'finalSurpriseEnvelope') break;
+                    }
+                    return true;
+                }""")
+                self.assertTrue(fully_shown, "Each final photo must load in its full proportions without clipping at 320 px.")
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth - innerWidth"), 1)
+        summary.click()
+        self.assertFalse(envelope.evaluate("element => element.open"))
+        expect(envelope.locator(":scope > .final-surprise-body")).not_to_be_visible()
+        after = self.background_snapshot()
+        self.assertFalse(after["paused"], "Opening and closing the final envelope must keep the music playing.")
+        self.assertEqual(after["currentTime"], before["currentTime"])
+        self.assertEqual(after["playCalls"], before["playCalls"])
+        self.assertEqual(after["pauseCalls"], before["pauseCalls"])
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+
 if __name__ == "__main__":
     unittest.main()
