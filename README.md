@@ -12,13 +12,18 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 - Um potinho de carinho revela frases da carta original, sem repetir a anterior, e pequenos capítulos dão acesso às datas da história.
 - Presente com a brincadeira dos R$ 0,20 e a revelação dos R$ 300,00. Ocultar o saldo também oculta o valor na mensagem.
 - Recados secretos, foco visível, respeito à preferência por movimento reduzido e conteúdo acessível mesmo sem JavaScript.
+- Quatro cartas “Abra quando…” e quatro vales de carinho abrem no próprio site, inclusive sem JavaScript. Para usar um vale, basta mostrar o recado; o site não envia mensagens nem registra um resgate.
+- Quiz de cinco perguntas sobre as datas, a música e o futuro de vocês, com respostas, resultado e opção de jogar novamente. Sem JavaScript, as perguntas e respostas continuam disponíveis.
+- Planos para viver juntos, incluindo o futuro pedido de casamento na Torre Eiffel. Os planos marcados como desejos ficam salvos somente neste navegador, quando o armazenamento está disponível.
 
 ## Estrutura
 
 ```text
 index.html                 Conteúdo da surpresa
 assets/css/style.css       Layout e identidade visual
+assets/css/chapters.css    Cartas, vales, quiz e planos de viagem
 assets/js/app.js           Interações e integração dos players
+assets/js/chapters.js      Quiz e desejos guardados neste navegador
 assets/js/audio-controller.js Continuidade, fades e estado de reprodução
 assets/js/details.js       Potinho de carinho e navegação de capítulos
 assets/js/date-utils.js    Cálculos de calendário no fuso UTC−03:00

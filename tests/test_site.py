@@ -1008,6 +1008,203 @@ class SiteTests(unittest.TestCase):
         self.assertIsNone(self.page.locator("#experienceProgress").get_attribute("role"))
         self.assert_no_runtime_errors()
 
+    def test_new_letters_vouchers_and_quiz_answers_work_without_javascript(self):
+        page = self.new_page(java_script_enabled=False)
+        page.goto(self.base_url + "/", wait_until="load")
+        for section_id, count in (("abra-quando", 4), ("vales", 4), ("quiz-do-casal", 5)):
+            with self.subTest(section=section_id):
+                section = page.locator(f"#{section_id}")
+                expect(section).to_be_visible()
+                details = section.locator("details")
+                expect(details).to_have_count(count)
+                for index in range(count):
+                    detail = details.nth(index)
+                    self.assertTrue(detail.evaluate("element => element instanceof HTMLDetailsElement"))
+                    summary = detail.locator(":scope > summary")
+                    summary.focus()
+                    summary.press("Enter")
+                    expect(detail).to_have_attribute("open", "")
+                    expect(detail.locator(":scope > :not(summary)").first).to_be_visible()
+                    summary.press("Enter")
+                    self.assertFalse(detail.evaluate("element => element.open"))
+        expect(page.locator("#coupleQuiz .quiz-question")).to_have_count(5)
+        expect(page.locator("#coupleQuiz input[type=radio]")).to_have_count(15)
+        expect(page.locator("#quizControls")).not_to_be_visible()
+        plans = page.locator("#proximos-destinos")
+        expect(plans).to_be_visible()
+        self.assertTrue(plans.evaluate("element => element.textContent.includes('Eiffel')"),
+                        "The future chapter must remain readable without JavaScript.")
+        expect(plans.locator("input[type=checkbox][data-wish-id]")).to_have_count(4)
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_couple_quiz_scores_each_answer_once_and_restarts_with_focus(self):
+        self.enter_quietly()
+        questions = self.page.locator("#coupleQuiz .quiz-question")
+        expect(questions).to_have_count(5)
+        check = self.page.locator("#quizCheck")
+        next_button = self.page.locator("#quizNext")
+        feedback = self.page.locator("#quizFeedback")
+        # These choices include two misses and three facts established by the page.
+        choices = (("may12", False), ("oct15", True), ("partilhar", False),
+                   ("may12", True), ("eiffel", True))
+        for index, (choice, correct) in enumerate(choices):
+            with self.subTest(question=index + 1):
+                question = questions.nth(index)
+                expect(self.page.locator("#coupleQuiz .quiz-question:not([hidden])")).to_have_count(1)
+                expect(question).to_be_visible()
+                expect(check).to_be_disabled()
+                expect(next_button).not_to_be_visible()
+                expect(feedback).not_to_be_visible()
+                expect(self.page.locator("#quizProgress")).to_have_text(f"Pergunta {index + 1} de 5")
+                radios = question.locator("input[type=radio]")
+                expect(radios).to_have_count(3)
+                question.locator(f'input[type=radio][value="{choice}"]').check()
+                expect(check).to_be_enabled()
+                if index == 1:
+                    check.dblclick()
+                else:
+                    check.click()
+                expect(check).to_be_disabled()
+                expect(question.locator("input[type=radio]:disabled")).to_have_count(3)
+                expect(feedback).to_be_visible()
+                expect(feedback).to_have_class(re.compile(r"\bis-correct\b" if correct else r"\bis-incorrect\b"))
+                if index != 1:
+                    expect(next_button).to_be_focused()
+                next_button.click()
+                if index < 4:
+                    expect(questions.nth(index + 1).locator("legend")).to_be_focused()
+        expect(self.page.locator("#quizResult")).to_be_visible()
+        expect(self.page.locator("#quizControls")).not_to_be_visible()
+        expect(self.page.locator("#quizResultTitle")).to_be_focused()
+        expect(self.page.locator("#coupleQuiz .quiz-question:not([hidden])")).to_have_count(0)
+        score_correct = self.page.locator("#quizResultText").evaluate(
+            r"element => /^Você acertou 3 de 5(?:\.|\s|$)/.test(element.textContent)"
+        )
+        self.assertTrue(score_correct, "A double check must count each answer only once.")
+        self.page.locator("#quizRestart").click()
+        expect(questions.first.locator("legend")).to_be_focused()
+        expect(self.page.locator("#coupleQuiz input[type=radio]:checked")).to_have_count(0)
+        expect(self.page.locator("#coupleQuiz input[type=radio]:disabled")).to_have_count(0)
+        expect(self.page.locator("#quizResult")).not_to_be_visible()
+        expect(check).to_be_disabled()
+        expect(next_button).not_to_be_visible()
+        expect(feedback).not_to_be_visible()
+        expect(self.page.locator("#quizProgress")).to_have_text("Pergunta 1 de 5")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_future_wishes_restore_after_reload_and_recover_from_corrupt_storage(self):
+        backend_requests = []
+        self.page.on("request", lambda request: backend_requests.append(True)
+                     if request.resource_type in ("fetch", "xhr") or request.method not in ("GET", "HEAD") else None)
+        self.enter_quietly()
+        wishes = self.page.locator("input[type=checkbox][data-wish-id]")
+        expect(wishes).to_have_count(4)
+        wishes.nth(0).check()
+        wishes.nth(1).check()
+        expect(self.page.locator("#wishStatus")).to_contain_text("Escolhas salvas só neste navegador")
+        saved = self.page.evaluate("""() => {
+            const expected = [...document.querySelectorAll('input[data-wish-id]:checked')]
+                .map(input => input.dataset.wishId).sort();
+            const stored = JSON.parse(localStorage.getItem('surprise:wishes:v1'));
+            return Array.isArray(stored) && JSON.stringify([...stored].sort()) === JSON.stringify(expected);
+        }""")
+        self.assertTrue(saved, "The wishlist must save the selected plans locally.")
+        self.page.reload(wait_until="load")
+        self.page.locator("#entryQuietBtn").click()
+        expect(wishes.nth(0)).to_be_checked()
+        expect(wishes.nth(1)).to_be_checked()
+        expect(wishes.nth(2)).not_to_be_checked()
+        expect(wishes.nth(3)).not_to_be_checked()
+        expect(self.page.locator("#wishStatus")).to_contain_text("guardados só neste navegador")
+        self.page.evaluate("localStorage.setItem('surprise:wishes:v1', '{invalid JSON')")
+        self.page.reload(wait_until="load")
+        self.page.locator("#entryQuietBtn").click()
+        expect(self.page.locator("input[data-wish-id]:checked")).to_have_count(0)
+        expect(self.page.locator("#wishStatus")).to_contain_text("não puderam ser recuperadas")
+        wishes.nth(2).check()
+        expect(wishes.nth(2)).to_be_checked()
+        expect(self.page.locator("#wishStatus")).to_contain_text("Escolhas salvas só neste navegador")
+        repaired = self.page.evaluate("""() => {
+            const stored = JSON.parse(localStorage.getItem('surprise:wishes:v1'));
+            const selected = document.querySelector('input[data-wish-id]:checked').dataset.wishId;
+            return Array.isArray(stored) && stored.length === 1 && stored[0] === selected;
+        }""")
+        self.assertTrue(repaired, "A new choice must replace malformed saved data.")
+        self.assertEqual(len(backend_requests), 0, "Choosing future plans must not contact a backend.")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_future_wishes_remain_usable_when_storage_read_or_write_is_unavailable(self):
+        for operation in ("getItem", "setItem"):
+            with self.subTest(storage_operation=operation):
+                page = self.new_page()
+                script = """(() => {
+                    const operation = '__OPERATION__';
+                    const original = Storage.prototype[operation];
+                    Storage.prototype[operation] = function (...args) {
+                        if (args[0] === 'surprise:wishes:v1')
+                            throw new DOMException('Storage unavailable for this check', 'SecurityError');
+                        return original.apply(this, args);
+                    };
+                })();"""
+                page.add_init_script(script.replace("__OPERATION__", operation))
+                self.enter_quietly(page)
+                status = page.locator("#wishStatus")
+                if operation == "getItem":
+                    expect(status).to_contain_text("Não consegui acessar as escolhas salvas")
+                wish = page.locator("input[type=checkbox][data-wish-id]").first
+                wish.check()
+                expect(wish).to_be_checked()
+                if operation == "setItem":
+                    expect(status).to_contain_text("Não consegui salvar neste navegador")
+                wish.uncheck()
+                expect(wish).not_to_be_checked()
+                page.close()
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_new_chapters_fit_a_phone_and_keyboard_actions_keep_music_playing(self):
+        self.page.set_viewport_size({"width": 320, "height": 720})
+        self.enter_with_mocked_music(background_duration=290.325)
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 44.25)")
+        before = self.background_snapshot()
+        for section_id in ("abra-quando", "vales"):
+            detail = self.page.locator(f"#{section_id} details").first
+            summary = detail.locator(":scope > summary")
+            summary.focus()
+            summary.press("Enter")
+            expect(detail).to_have_attribute("open", "")
+            expect(detail.locator(":scope > :not(summary)").first).to_be_visible()
+        wish = self.page.locator("input[type=checkbox][data-wish-id]").first
+        wish.focus()
+        wish.press("Space")
+        expect(wish).to_be_checked()
+        question = self.page.locator("#coupleQuiz .quiz-question:not([hidden])")
+        answer = question.locator('input[type=radio][value="may08"]')
+        answer.focus()
+        answer.press("Space")
+        expect(answer).to_be_checked()
+        self.page.locator("#quizCheck").press("Enter")
+        expect(self.page.locator("#quizFeedback")).to_be_visible()
+        self.page.locator("#quizNext").press("Enter")
+        expect(self.page.locator("#coupleQuiz .quiz-question").nth(1).locator("legend")).to_be_focused()
+        for section_id in ("abra-quando", "vales", "quiz-do-casal", "proximos-destinos"):
+            fits = self.page.locator(f"#{section_id}").evaluate("""element => {
+                const {left, right} = element.getBoundingClientRect();
+                return left >= -1 && right <= innerWidth + 1 && element.scrollWidth <= element.clientWidth + 1;
+            }""")
+            self.assertTrue(fits, "The new chapter must fit a 320 px screen with its content expanded.")
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth - innerWidth"), 1)
+        after = self.background_snapshot()
+        self.assertFalse(after["paused"], "Reading, planning and answering must keep the selected music playing.")
+        self.assertEqual(after["currentTime"], before["currentTime"])
+        self.assertEqual(after["playCalls"], before["playCalls"])
+        self.assertEqual(after["pauseCalls"], before["pauseCalls"])
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
 
 if __name__ == "__main__":
     unittest.main()
