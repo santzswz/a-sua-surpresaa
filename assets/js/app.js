@@ -70,11 +70,15 @@
   const photoListenButton = byId('photoListenBtn');
   const photoMusicStatus = byId('photoMusicStatus');
   const photoDialog = document.querySelector('.photo-dialog');
-  const photos = [...document.querySelectorAll('.shot')].map(figure => ({
-    figure, button: figure.querySelector('.shot-button'), image: figure.querySelector('img'),
-    caption: figure.querySelector('figcaption')?.textContent.trim() || '',
+  const readAlbum = selector => [...document.querySelectorAll(selector)].map(figure => ({
+    figure, button: figure.querySelector('.shot-button, .final-surprise-photo-button, [data-photo-open]'),
+    image: figure.querySelector('img'), caption: figure.querySelector('figcaption')?.textContent.trim() || '',
     note: figure.querySelector('.shot-note')?.textContent.trim() || ''
   })).filter(photo => photo.button && photo.image);
+  const galleryPhotos = readAlbum('.shot');
+  const finalPhotos = readAlbum('.final-surprise-photo');
+  const allPhotos = [...galleryPhotos, ...finalPhotos];
+  let photos = galleryPhotos;
   let enabled = false;
   let backgroundWanted = true;
   let opened = false;
@@ -83,6 +87,7 @@
   let photoRevision = 0;
   let pendingPreview = null;
   let photoRequestState = 'idle';
+  let restoreBackgroundAfterPhoto = false;
   const previewCache = new Map();
   const backgroundSong = background?.dataset.song || 'A nossa trilha';
   const isBackgroundPhoto = photo => Boolean(background?.dataset.trackId
@@ -147,7 +152,7 @@
       : backgroundPlaying ? 'A nossa trilha continua. Toque em ▶︎ para ouvir esta lembrança.'
       : enabled && audioState.photoPlaying && !selectedAudio ? 'A música anterior continua. Toque em ▶︎ para ouvir esta lembrança.'
       : `Toque em ▶︎ para continuar ${selectedIsBackground ? 'a música' : 'o trecho'} desta lembrança.`;
-    photos.forEach(photo => photo.figure.classList.toggle('playing', enabled && selectedPhotoAudio(photo)
+    allPhotos.forEach(photo => photo.figure.classList.toggle('playing', enabled && selectedPhotoAudio(photo)
       && (isBackgroundPhoto(photo) ? audioState.backgroundPlaying : audioState.photoPlaying)));
     const duration = audioState.backgroundDuration;
     const elapsed = audioState.backgroundTime || 0;
@@ -160,6 +165,7 @@
   function cancelPhotoRequest() {
     photoRevision += 1;
     pendingPreview?.cancel();
+    audioController?.cancelPreparation();
     pendingPreview = null;
     photoRequestState = 'idle';
   }
@@ -175,12 +181,13 @@
     void audioController?.playBackground({ explicit });
     renderAudio();
   }
-  // Looking at another photo never restarts or replaces the background track.
+  // New selections invalidate unfinished media work without resetting positions.
   function handlePhotoNavigation({ closing = false } = {}) {
     cancelPhotoRequest();
-    if (closing && enabled && audioState.target === 'photo') {
-      if (backgroundWanted) playBackground();
-      else stopAudio();
+    if (closing || !selectedPhotoAudio(photos[photoIndex])) audioController?.cancelPending();
+    if (closing && enabled) {
+      if (restoreBackgroundAfterPhoto && backgroundWanted) playBackground();
+      else audioController?.pause();
     }
     renderAudio();
   }
@@ -243,29 +250,40 @@
       rejectRequest(new Error('Preview canceled'));
     } };
   }
-  async function playPhoto() {
-    if (photoIndex < 0 || document.hidden) return;
-    if (isBackgroundPhoto(photos[photoIndex])) {
-      enabled = true;
-      backgroundWanted = true;
-      playBackground({ explicit: true });
-      return;
-    }
+  async function playPhoto({ explicit = true, automatic = false } = {}) {
+    if (photoIndex < 0 || !opened || document.hidden || (automatic && !enabled)) return;
     cancelPhotoRequest();
-    enabled = true;
-    photoRequestState = 'loading';
+    if (!automatic) enabled = true;
     const photo = photos[photoIndex];
     const token = photoRevision;
-    const request = loadPreview(photo.image.dataset.trackId);
-    pendingPreview = request;
-    renderAudio();
     try {
-      const preview = await request.promise;
-      if (token !== photoRevision || photoIndex < 0 || !enabled || document.hidden) return;
-      pendingPreview = null;
-      photoRequestState = 'idle';
       if (!audioController) throw new Error('Audio unavailable');
-      await audioController.playPhoto(photo.image.dataset.trackId, preview, { explicit: true });
+      if (isBackgroundPhoto(photo)) {
+        // This gallery item shares the full MP3 and its saved playback position.
+        await audioController.playBackground({ explicit });
+      } else {
+        const trackId = photo.image.dataset.trackId;
+        if (!/^\d+$/.test(trackId || '')) throw new Error('Invalid track');
+        const direct = validPreview(photo.image.dataset.preview) || previewCache.get(trackId);
+        if (direct) {
+          // Start within the click/swipe gesture, without waiting for JSONP.
+          previewCache.set(trackId, direct);
+          await audioController.playPhoto(trackId, direct, { explicit });
+        } else {
+          // iOS needs the eventual media element to play inside this gesture.
+          // Its short preparation contains only digital silence.
+          audioController.preparePhoto(trackId);
+          photoRequestState = 'loading';
+          const request = loadPreview(trackId);
+          pendingPreview = request;
+          renderAudio();
+          const preview = await request.promise;
+          if (token !== photoRevision || photoIndex < 0 || !enabled || document.hidden) return;
+          pendingPreview = null;
+          photoRequestState = 'idle';
+          await audioController.playPhoto(trackId, preview, { explicit });
+        }
+      }
     } catch {
       if (token !== photoRevision) return;
       pendingPreview = null;
@@ -278,7 +296,7 @@
       || (audioState.suspended && audioState.desired))) stopAudio();
     else {
       enabled = true;
-      if (photoIndex >= 0 && audioState.target === 'photo') void audioController?.resume({ explicit: true });
+      if (photoIndex >= 0) void playPhoto();
       else { backgroundWanted = true; playBackground({ explicit: true }); }
     }
   }
@@ -313,10 +331,11 @@
     window.scrollTo({ top: savedScrollY, behavior: 'instant' });
     pageLocked = false;
   }
-  function showPhoto(index) {
+  function showPhoto(index, { explicit = false } = {}) {
     if (!photoDialog || !photos.length || typeof photoDialog.showModal !== 'function') return;
+    if (!photoDialog.open) restoreBackgroundAfterPhoto = enabled && backgroundWanted && audioState.desired;
     photoIndex = (index + photos.length) % photos.length;
-    lastPhotoIndex = photoIndex;
+    if (photos === galleryPhotos) lastPhotoIndex = photoIndex;
     const photo = photos[photoIndex];
     handlePhotoNavigation();
     const image = byId('modalImg');
@@ -337,6 +356,7 @@
     }
     if (!photoDialog.open) { lockPage(); photoDialog.showModal(); }
     renderAudio();
+    void playPhoto({ explicit, automatic: !explicit });
   }
   function finishPhoto() {
     if (photoIndex < 0) return;
@@ -349,21 +369,24 @@
     requestAnimationFrame(() => { if (!photoDialog?.open) trigger?.focus({ preventScroll: true }); });
   }
   function closePhoto() { photoDialog?.close(); finishPhoto(); }
-  document.querySelector('.gallery')?.addEventListener('click', event => {
-    const button = event.target.closest('.shot-button');
-    const index = photos.findIndex(photo => photo.button === button);
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.shot-button, .final-surprise-photo-button, [data-photo-open]');
+    const album = button?.closest('.final-surprise-photos') ? finalPhotos : galleryPhotos;
+    const index = album.findIndex(photo => photo.button === button);
     if (index < 0) return;
+    photos = album;
     photoTrigger = button;
-    showPhoto(index);
+    showPhoto(index, { explicit: true });
   });
   const randomButton = byId('randomMemoryBtn');
-  if (randomButton && photos.length && typeof photoDialog?.showModal === 'function') {
+  if (randomButton && galleryPhotos.length && typeof photoDialog?.showModal === 'function') {
     randomButton.hidden = false;
     randomButton.addEventListener('click', () => {
-      const choices = photos.map((_, index) => index).filter(index => index !== lastPhotoIndex);
+      photos = galleryPhotos;
+      const choices = galleryPhotos.map((_, index) => index).filter(index => index !== lastPhotoIndex);
       const index = choices[Math.floor(Math.random() * choices.length)] ?? 0;
       photoTrigger = randomButton;
-      showPhoto(index);
+      showPhoto(index, { explicit: true });
     });
   }
   byId('photoPrev')?.addEventListener('click', () => showPhoto(photoIndex - 1));
@@ -453,7 +476,7 @@
   function renderBalance() {
     const eye = byId('balanceEye');
     const message = byId('realBalanceMessage');
-    setText('balanceValue', balanceVisible ? realRevealed ? 'R$ 300,00' : 'R$ 0,20' : 'R$ ••••');
+    setText('balanceValue', balanceVisible ? realRevealed ? 'R$ 200,00' : 'R$ 0,20' : 'R$ ••••');
     setText('balanceLabel', !balanceVisible ? 'Saldo do seu presente' : realRevealed ? 'Agora é o saldo de verdade' : 'Seu saldo… eu juro');
     setText('prankCopy', balanceVisible && !realRevealed ? 'KKKKKK calma, minha benção. Eu não sou tão miserável assim.' : '');
     eye?.classList.toggle('revealed', balanceVisible);
@@ -503,14 +526,21 @@
   window.visualViewport?.addEventListener('resize', scheduleProgress, { passive: true });
   window.addEventListener('load', scheduleProgress, { once: true });
   scheduleProgress();
+  function resumeVisibleAudio() {
+    if (document.hidden) return;
+    void audioController?.resumeFromSuspension();
+    if (enabled && photoIndex >= 0) {
+      handlePhotoNavigation();
+      void playPhoto({ explicit: false, automatic: true });
+    }
+  }
   document.addEventListener('visibilitychange', () => {
     scheduleCounters();
     if (document.hidden) { cancelPhotoRequest(); audioController?.suspend(); }
-    else if (enabled) void audioController?.resumeFromSuspension();
-    else audioController?.resumeFromSuspension();
+    else resumeVisibleAudio();
   });
   window.addEventListener('pagehide', () => { cancelPhotoRequest(); audioController?.suspend(); });
-  window.addEventListener('pageshow', event => { if (event.persisted) void audioController?.resumeFromSuspension(); });
+  window.addEventListener('pageshow', event => { if (event.persisted) resumeVisibleAudio(); });
   renderAudio();
   if (entryGate && typeof entryGate.showModal === 'function') { lockPage(); entryGate.showModal(); }
   else opened = true;

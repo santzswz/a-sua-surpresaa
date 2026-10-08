@@ -55,3 +55,6 @@ main > .final-surprise-section { padding: 0 0 76px; background: #2c1923; }
 @media (prefers-reduced-motion:reduce) {
   .final-surprise-section *, .final-surprise-section *::before, .final-surprise-section *::after { animation: none !important; transition: none !important; }
 }
+
+.final-surprise-photo-button { display: block; width: 100%; padding: 0; border: 0; border-radius: 1px; background: none; line-height: 0; cursor: pointer; }
+.final-surprise-photo-button:focus-visible { outline: 3px solid var(--wine2); outline-offset: 5px; }

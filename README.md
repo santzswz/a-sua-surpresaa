@@ -7,10 +7,11 @@ Uma surpresa de aniversário feita de carta, fotografias e música. Site estáti
 - Envelope de entrada com escolha de ouvir música ou entrar sem som.
 - Carta original, desejos de aniversário, linha do tempo e contador da nossa história.
 - Dez fotografias preservadas no próprio repositório; nove lembranças na galeria, com navegação por botões, teclado e deslize no celular. Cada lembrança ganhou um recado carinhoso, também visível na foto ampliada; as datas da história têm novas notas pessoais.
-- **Te Amo Disgraça — Baco Exu do Blues**, inteira, no MP3 enviado ao repositório: começa no início e continua ao abrir e navegar pelas fotos, conserva a posição ao pausar e tem entrada e saída suaves. A foto ligada à mesma música compartilha esse áudio, sem reiniciar nem carregar uma prévia.
-- As demais músicas das fotos entram apenas pelo seu player e usam prévias de cerca de 30 segundos. Todas as faixas terminam sem repetição automática; os links das outras músicas levam aos serviços de origem.
+- **Te Amo Disgraça — Baco Exu do Blues**, inteira, no MP3 enviado ao repositório: começa no início, conserva a posição ao pausar e tem entrada e saída suaves. A foto ligada à mesma música e as três fotos do envelope final compartilham esse áudio, sem reiniciar nem carregar uma prévia.
+- Ao abrir uma foto, sua música começa usando o próprio clique, com fade nos navegadores que permitem controlar seu volume. As demais músicas da galeria usam prévias de cerca de 30 segundos. Todas as faixas terminam sem repetição automática; os links das outras músicas levam aos serviços de origem.
 - Um potinho de carinho revela frases da carta original, sem repetir a anterior, e pequenos capítulos dão acesso às datas da história.
-- Presente com a brincadeira dos R$ 0,20 e a revelação dos R$ 300,00. Ocultar o saldo também oculta o valor na mensagem.
+- Presente de R$ 200,00 com a brincadeira dos R$ 0,20 antes da revelação. O saldo ganhou destaque e as lojas ficam alinhadas; ocultar o saldo também oculta o valor na mensagem.
+- Menu “Explorar” com atalhos para as partes da história, cartas, vales, quiz, planos e envelope final, com teclado e layout para celular.
 - Recados secretos, foco visível, respeito à preferência por movimento reduzido e conteúdo acessível mesmo sem JavaScript.
 - Envelope surpresa no final, fechado até abrir, com três imagens na ordem enviada. A primeira e a terceira são os arquivos originais; o arroba da segunda foi removido, mantendo a frase. A sequência também funciona sem JavaScript.
 - Quatro cartas “Abra quando…” e quatro vales de carinho abrem no próprio site, inclusive sem JavaScript. Para usar um vale, basta mostrar o recado; o site não envia mensagens nem registra um resgate.
@@ -26,6 +27,7 @@ assets/css/chapters.css    Cartas, vales, quiz e planos de viagem
 assets/css/final-surprise.css Envelope final com três fotografias
 assets/js/app.js           Interações e integração dos players
 assets/js/chapters.js      Quiz e desejos guardados neste navegador
+assets/js/navigation.js    Menu dos capítulos e navegação por atalhos
 assets/js/audio-controller.js Continuidade, fades e estado de reprodução
 assets/js/details.js       Potinho de carinho e navegação de capítulos
 assets/js/date-utils.js    Cálculos de calendário no fuso UTC−03:00
@@ -62,8 +64,8 @@ O texto, as legendas e as músicas da galeria ficam em `index.html`. As datas de
 
 Os controles de saldo fazem parte da brincadeira visual: o site é público, e o valor também pode ser encontrado no código. Preserve os arquivos de fotos ao editar o projeto.
 
-O áudio começa apenas por uma ação da pessoa. O MP3 original tem aproximadamente 4min50s e é usado sem cortes ou conversão. A trilha de fundo continua ao visitar a galeria; a foto de Te Amo Disgraça usa o mesmo player. As outras músicas substituem a trilha quando a prévia fica pronta. Cada faixa conserva sua posição nesta visita e só recomeça após o fim por um toque explícito no player. O áudio é pausado imediatamente quando a aba fica oculta.
+O áudio começa apenas por uma ação da pessoa: abrir uma foto também conta como o toque para ouvir sua música. O MP3 original tem aproximadamente 4min50s e é usado sem cortes ou conversão. As fotos de Te Amo Disgraça usam o mesmo player; as outras músicas substituem a trilha quando a prévia fica pronta. Navegar pelas fotos troca para a música da lembrança atual; uma pausa manual permanece ao navegar dentro da mesma abertura. Ao fechar a foto, a trilha de fundo volta se já estava ativada antes da abertura. Cada faixa conserva sua posição nesta visita e só recomeça após o fim por um toque explícito no player ou ao abrir novamente a foto. O áudio é pausado imediatamente quando a aba fica oculta.
 
-O fade do MP3 local usa Web Audio quando disponível, inclusive no iOS, com fallback para o volume nativo. O contexto de áudio só é criado ao ouvir a música. As prévias externas continuam usando o volume nativo, conforme o suporte do navegador; no iOS, a troca com essas faixas é sequencial para evitar duas músicas tocando juntas.
+O fade do MP3 local usa Web Audio quando disponível, inclusive no iOS, com fallback para o volume nativo. O contexto de áudio só é criado ao ouvir a música. As prévias externas continuam usando o volume nativo, conforme o suporte do navegador; no iOS, a troca com essas faixas é sequencial para evitar duas músicas tocando juntas. Quando a prévia ainda depende da consulta ao Deezer, o clique prepara sua instância de áudio com 50 ms de silêncio no iOS; o retorno da consulta usa essa mesma instância, sem exigir um segundo toque.
 
 O workflow de verificação executa os testes em pull requests e em alterações de `main`. A publicação continua usando a configuração existente do GitHub Pages.

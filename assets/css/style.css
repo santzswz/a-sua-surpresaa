@@ -162,3 +162,94 @@ h1[tabindex="-1"]:focus-visible{outline:none}.icon-arrow{display:inline-block;wi
 .timeline-heartnote{margin-top:17px!important;padding:13px 0 0;border-top:1px solid var(--line);color:var(--wine2)!important;font:500 24px/1.45 var(--hand)!important}
 @media(max-width:820px){.shot-note{margin-inline:3px;font-size:12px;line-height:1.7}#photoNote{font-size:14px;margin-bottom:17px}.timeline-heartnote{font-size:24px!important}}
 @media(max-width:360px){.shot-note{font-size:13px;margin-inline:9px}}
+
+/* The gift reads as one card: invitation, balance, note and places to choose. */
+#presente {
+  gap: 27px;
+  border-color: rgba(173,134,82,.3);
+  background: radial-gradient(ellipse at 100% 0, rgba(255,252,247,.65), transparent 48%), linear-gradient(145deg,#f4e7df,#efdadd);
+  box-shadow: 0 18px 48px rgba(89,37,56,.07);
+}
+#presente > div:first-child, #presente .gift-top > div:first-child { min-width: 0; }
+#presente .gift-top { align-items: center; gap: 18px; }
+#presente .gift-top > div:first-child { flex: 1; }
+#presente h3 { margin-top: 18px; font-size: clamp(31px,3.3vw,42px); line-height: 1.14; text-wrap: balance; }
+#presente .gift-icon { flex-basis: 52px; width: 52px; height: 52px; border: 1px solid rgba(173,134,82,.24); background: var(--paper); font-size: 24px; box-shadow: 0 6px 15px rgba(89,37,56,.04); }
+#presente > div:first-child > p { color: #67535d; font-size: 14px; line-height: 1.85; }
+#presente .gift-balance { margin: 29px 0 0; padding: 25px; border-color: rgba(173,134,82,.26); border-radius: 16px; background: var(--paper); box-shadow: 0 5px 15px rgba(89,37,56,.035); }
+#presente .balance-head { gap: 15px; }
+#presente .balance-head small { min-width: 0; color: var(--wine2); font-size: 10px; line-height: 1.8; letter-spacing: .1em; }
+#presente .balance-eye { flex-basis: 44px; width: 44px; height: 44px; background: #fbf5ef; }
+#presente .balance-eye svg { width: 21px; height: 21px; }
+#presente .balance-value { margin-top: 14px; font-size: clamp(38px,3.8vw,50px); line-height: 1.18; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+#presente .prank-copy { margin-top: 13px; font-size: 12px; line-height: 1.85; }
+#presente .prank-copy:empty { display: none; }
+#presente .real-balance-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 47px; margin-top: 18px; padding: 13px 16px; border-color: rgba(89,37,56,.3); background: var(--blush); font-size: 12px; line-height: 1.65; }
+#presente .real-balance-message { margin-top: 21px; padding: 19px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+#presente .real-balance-message > span { color: var(--wine2); font-size: 10px; font-weight: 600; letter-spacing: .12em; }
+#presente .real-balance-message p { margin-top: 11px; color: var(--muted); font-size: 14px; line-height: 1.85; }
+#presente .real-balance-message strong { color: var(--wine); font: 600 16px/1.85 var(--sans); }
+#presente .gift-balance.real-revealed { border-color: rgba(173,134,82,.6); background: linear-gradient(145deg,#fffcf7,#faf0e6); box-shadow: 0 9px 26px rgba(89,37,56,.065); }
+#presente .physical-gift-tease { gap: 12px; margin-top: 22px; padding-top: 19px; border-top: 1px solid rgba(89,37,56,.11); }
+#presente .physical-gift-tease > span { flex: 0 0 17px; padding-top: 1px; }
+#presente .physical-gift-tease p { color: #67535d; font-size: 12px; line-height: 1.8; }
+#presente .shops { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+#presente .shop { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; min-height: 47px; padding: 11px 13px; border-color: rgba(89,37,56,.17); border-radius: 8px; background: rgba(255,252,247,.75); color: var(--wine); font-size: 12px; line-height: 1.5; }
+#presente .shop .icon-arrow { width: 14px; height: 14px; }
+#presente [hidden] { display: none !important; }
+@media (hover:hover) {
+  #presente .shop:hover { border-color: var(--rose); background: var(--paper); }
+  #presente .real-balance-btn:hover { background: #ecd4d8; }
+}
+
+/* The direct destinations stay handy; the rest of the story has one clear menu. */
+.nav { gap: 20px; }
+.navlinks { gap: 9px; }
+.navlinks a { min-height: 44px; padding-inline: 14px; }
+.sound-toggle { flex-basis: 44px; width: 44px; height: 44px; }
+.nav a:focus-visible, .nav button:focus-visible { outline: 3px solid var(--wine2); outline-offset: 3px; }
+.chapter-menu { position: static; min-width: 0; }
+.chapter-menu > summary { display: inline-flex; align-items: center; justify-content: center; gap: 11px; min-height: 44px; padding: 10px 15px; border: 1px solid var(--wine); border-radius: 8px; color: var(--paper); background: var(--wine); cursor: pointer; list-style: none; font-size: 12px; font-weight: 600; line-height: 1.6; white-space: nowrap; }
+.chapter-menu > summary::-webkit-details-marker { display: none; }
+.chapter-menu > summary::marker { content: ""; }
+.chapter-menu > summary > span { display: block; width: 7px; height: 7px; margin-top: -3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; font-size: 0; transform: rotate(45deg); }
+.chapter-menu[open] > summary { background: #422030; }
+.chapter-menu[open] > summary > span { margin-top: 3px; transform: rotate(225deg); }
+.chapter-menu > summary:focus-visible { outline: 3px solid var(--wine2); outline-offset: 3px; }
+.chapter-menu-panel { position: absolute; z-index: 35; top: calc(100% + 12px); right: 12px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; width: min(460px,calc(100vw - 48px)); max-height: calc(100vh - 150px); max-height: min(640px,calc(100dvh - 150px)); padding: 19px; overflow: auto; overscroll-behavior: contain; border: 1px solid rgba(89,37,56,.2); border-radius: 14px; color: var(--wine); background: var(--paper); box-shadow: 0 20px 55px rgba(47,20,31,.18); }
+.chapter-menu:not([open]) .chapter-menu-panel { display: none; }
+.chapter-menu-label { grid-column: 1 / -1; padding: 11px 5px 5px; color: var(--wine2); font-size: 10px; font-weight: 600; line-height: 1.6; letter-spacing: .12em; text-transform: uppercase; }
+.chapter-menu-label:first-child { padding-top: 0; }
+.navlinks .chapter-menu-panel > a { display: flex; align-items: center; justify-content: flex-start; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--wine); background: #fcf7f0; font-size: 12px; line-height: 1.6; font-weight: 500; text-align: left; white-space: normal; }
+.navlinks .chapter-menu-panel > a:last-child { grid-column: 1 / -1; }
+.navlinks .chapter-menu-panel > a:hover, .navlinks .chapter-menu-panel > a[aria-current="location"] { border-color: var(--rose); background: var(--blush); }
+@media (max-width:820px) {
+  #presente { gap: 24px; }
+  #presente h3 { font-size: 35px; }
+  #presente .gift-icon { flex-basis: 46px; width: 46px; height: 46px; font-size: 22px; }
+  .nav { gap: 12px; }
+  .navlinks { gap: 4px; }
+  .navlinks a { padding-inline: 9px; }
+}
+@media (max-width:520px) {
+  .nav { gap: 8px; width: calc(100% - 24px); padding: 8px 11px; }
+  .brand { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; }
+  .navlinks { gap: 0; margin-left: auto; }
+  .navlinks > .nav-direct { display: none; }
+  .chapter-menu > summary { gap: 9px; padding-inline: 13px; font-size: 12px; }
+  .chapter-menu-panel { grid-template-columns: minmax(0,1fr); right: 10px; width: calc(100vw - 46px); padding: 17px; }
+  .navlinks .chapter-menu-panel > a { padding: 11px 13px; font-size: 13px; }
+  .hero { padding-top: 110px; }
+}
+@media (max-width:420px) {
+  #presente { padding: 25px 21px; }
+  #presente h3 { font-size: 32px; }
+  #presente .gift-top { gap: 13px; }
+  #presente .gift-icon { flex-basis: 44px; width: 44px; height: 44px; }
+  #presente .gift-balance { margin-top: 24px; padding: 21px 18px; }
+  #presente .balance-head { gap: 11px; }
+  #presente .balance-head small { font-size: 9px; letter-spacing: .08em; }
+  #presente .balance-value { font-size: 41px; }
+  #presente .real-balance-message p { font-size: 13px; }
+  #presente .shop { padding-inline: 11px; font-size: 11px; }
+}

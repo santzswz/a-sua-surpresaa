@@ -42,12 +42,11 @@
   function updateChapter() {
     frame = 0;
     const threshold = Math.min(innerHeight * 0.36, 250);
-    const active = chapters.find(chapter => {
-      const bounds = chapter.section.getBoundingClientRect();
-      return bounds.top <= threshold && bounds.bottom > 95;
-    });
+    const active = chapters.map(chapter => ({ ...chapter, bounds: chapter.section.getBoundingClientRect() }))
+      .filter(chapter => chapter.bounds.top <= threshold && chapter.bounds.bottom > 95)
+      .sort((a, b) => b.bounds.top - a.bounds.top || a.bounds.height - b.bounds.height)[0];
     for (const chapter of chapters) {
-      const current = chapter === active;
+      const current = chapter.section === active?.section;
       chapter.link.classList.toggle('active', current);
       if (current) chapter.link.setAttribute('aria-current', 'location');
       else chapter.link.removeAttribute('aria-current');

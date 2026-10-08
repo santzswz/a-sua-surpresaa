@@ -316,6 +316,16 @@ class SiteTests(unittest.TestCase):
         self.page.route("https://api.deezer.com/**", available_preview)
         return requested_tracks
 
+    def set_direct_photo_previews(self):
+        self.page.locator(".shot img").evaluate_all("""images => images.forEach(image => {
+            image.dataset.preview = 'https://cdnt-preview.dzcdn.net/preview-' + image.dataset.trackId + '.mp3';
+        })""")
+
+    def remove_direct_photo_previews(self):
+        self.page.locator(".shot img").evaluate_all(
+            "images => images.forEach(image => delete image.dataset.preview)"
+        )
+
     def test_content_stays_visible_without_javascript(self):
         page = self.new_page(java_script_enabled=False)
         page.goto(self.base_url + "/", wait_until="load")
@@ -351,7 +361,9 @@ class SiteTests(unittest.TestCase):
         self.assert_no_runtime_errors()
 
     def test_gallery_supports_keyboard_wraparound_and_restores_focus(self):
+        self.mock_immediate_playback()
         self.enter_quietly()
+        self.set_direct_photo_previews()
         buttons = self.page.locator(".shot-button")
         first = buttons.first
         sources = self.page.locator(".shot img").evaluate_all("images => images.map(img => img.src)")
@@ -361,7 +373,7 @@ class SiteTests(unittest.TestCase):
         self.assertTrue(dialog.evaluate("el => el instanceof HTMLDialogElement && el.open"))
         self.assertTrue(dialog.evaluate("el => el.contains(document.activeElement)"))
         self.assert_current_photo(sources[0])
-        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Som desligado")
+        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Tocando um trecho")
         self.page.keyboard.press("ArrowRight")
         self.assert_current_photo(sources[1])
         self.page.keyboard.press("ArrowLeft")
@@ -378,7 +390,9 @@ class SiteTests(unittest.TestCase):
         self.assert_no_runtime_errors()
 
     def test_photo_note_and_accessible_description_follow_selection(self):
+        self.mock_immediate_playback()
         self.enter_quietly()
+        self.set_direct_photo_previews()
         preserved_frames = self.page.locator(".gallery").evaluate("""gallery => {
             const shots = [...gallery.querySelectorAll(':scope > figure.shot')];
             return shots.length === 9 && shots.every(shot =>
@@ -437,7 +451,7 @@ class SiteTests(unittest.TestCase):
         expect(reveal).to_be_visible()
         expect(real_message).not_to_be_visible()
         reveal.click()
-        expect(value).to_have_text("R$ 300,00")
+        expect(value).to_have_text("R$ 200,00")
         expect(real_message).to_be_visible()
         eye.click()
         expect(eye).to_have_attribute("aria-pressed", "false")
@@ -445,7 +459,7 @@ class SiteTests(unittest.TestCase):
         expect(real_message).to_have_attribute("hidden", "")
         expect(real_message).not_to_be_visible()
         expect(reveal).not_to_be_visible()
-        value_visible = self.page.locator("#giftBalance").evaluate('el => el.innerText.includes("300,00")')
+        value_visible = self.page.locator("#giftBalance").evaluate('el => el.innerText.includes("200,00")')
         self.assertFalse(value_visible, "Hiding the gift balance must hide its amount everywhere in the card.")
         self.assert_no_runtime_errors()
 
@@ -506,9 +520,9 @@ class SiteTests(unittest.TestCase):
 
     def test_unavailable_photo_music_keeps_navigation_working(self):
         self.enter_quietly()
+        self.remove_direct_photo_previews()
         first = self.page.locator(".shot-button").first
         first.click()
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoMusicStatus")).to_contain_text("O trecho está indisponível")
         expect(self.page.locator("#photoTrackLink")).to_have_attribute("href", re.compile(r"^https://"))
         sources = self.page.locator(".shot img").evaluate_all("images => images.map(img => img.src)")
@@ -545,8 +559,8 @@ class SiteTests(unittest.TestCase):
 
         self.page.route("https://api.deezer.com/**", invalid_preview)
         self.enter_quietly()
+        self.remove_direct_photo_previews()
         self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoMusicStatus")).to_contain_text("O trecho está indisponível")
         untrusted_request = any(urlparse(url).hostname == "evil.example" for url in self.external_requests)
         self.assertFalse(untrusted_request, "Untrusted preview URLs must be rejected before a request.")
@@ -572,16 +586,16 @@ class SiteTests(unittest.TestCase):
         self.assertTrue(self.page.locator("#bgMusic").evaluate("audio => audio.paused"))
         self.assert_no_runtime_errors()
 
-    def test_photo_music_requires_a_click_for_every_selected_memory(self):
+    def test_opening_and_navigating_photos_plays_their_music_and_respects_pause(self):
         self.mock_immediate_playback()
         requested_tracks = self.mock_available_previews()
         self.enter_quietly()
+        self.remove_direct_photo_previews()
         expected_tracks = self.page.locator(".shot img").evaluate_all(
             "images => images.slice(0, 2).map(image => image.dataset.trackId)"
         )
+        self.assert_no_media_requests()
         self.page.locator(".shot-button").first.click()
-        self.assertEqual(len(requested_tracks), 0, "Opening a photo must not request music.")
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoMusicStatus")).to_contain_text("Tocando um trecho")
         expect(self.page.locator(".shot").nth(0)).to_have_class(re.compile(r"\bplaying\b"))
         self.page.evaluate("""track => {
@@ -591,24 +605,25 @@ class SiteTests(unittest.TestCase):
         self.assertFalse(self.page.evaluate("__firstPhotoAudio.loop"), "Photo excerpts must not loop.")
         before_navigation = self.page.evaluate("__mediaMock.snapshot(__firstPhotoAudio)")
         self.page.locator("#photoNext").click()
-        self.assertFalse(self.page.evaluate("__firstPhotoAudio.paused"), "Photo navigation must keep the active excerpt playing.")
-        self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__firstPhotoAudio).playCalls"),
-                         before_navigation["playCalls"], "Photo navigation must not restart the active excerpt.")
-        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
-        self.assertEqual(requested_tracks, expected_tracks[:1], "Navigation must not start the next track.")
-        self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25)
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator(".shot").nth(1)).to_have_class(re.compile(r"\bplaying\b"))
-        self.assertEqual(requested_tracks, expected_tracks, "Each listen action must request the selected track.")
+        self.page.wait_for_function("__firstPhotoAudio.paused")
+        self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__firstPhotoAudio).playCalls"),
+                         before_navigation["playCalls"], "Switching memories must stop the old excerpt without restarting it.")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.assertEqual(requested_tracks, expected_tracks, "Navigation must start the selected photo's track.")
+        self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25)
         self.page.locator("#photoPrev").click()
-        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator(".shot").nth(0)).to_have_class(re.compile(r"\bplaying\b"))
         self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25,
                          "Returning to an excerpt must resume its saved position.")
         self.assertEqual(requested_tracks, expected_tracks, "A cached excerpt must not be fetched again.")
         self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        self.page.keyboard.press("ArrowRight")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.assertTrue(self.page.evaluate("__mediaMock.allPaused()"), "Navigation must respect a pause made inside the photo dialog.")
+        self.assertEqual(requested_tracks, expected_tracks)
         self.page.keyboard.press("Escape")
         expect(self.page.locator(".photo-dialog")).not_to_be_visible()
         expect(self.page.locator(".shot-button").first).to_be_focused()
@@ -616,11 +631,19 @@ class SiteTests(unittest.TestCase):
         self.page.wait_for_function("__mediaMock.allPaused()")
         expect(self.page.locator(".audio-panel")).not_to_have_class(re.compile(r"\bis-playing\b"))
         self.assertTrue(self.page.locator("#bgMusic").evaluate("audio => audio.paused"))
+        self.page.locator(".shot-button").first.click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.assertEqual(self.page.evaluate("__firstPhotoAudio.currentTime"), 8.25,
+                         "Opening a photo again is a new listening gesture and must resume its saved excerpt.")
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_function("__mediaMock.allPaused()")
         self.assert_no_runtime_errors()
 
     def test_late_audio_play_cannot_resume_after_muting(self):
         self.mock_immediate_playback(deferred=True)
+        self.mock_available_previews()
         self.enter_quietly()
+        self.remove_direct_photo_previews()
         toggle = self.page.locator("#soundToggle")
         toggle.click()
         self.page.wait_for_function("window.__pendingPlayback.length === 1")
@@ -630,31 +653,53 @@ class SiteTests(unittest.TestCase):
         expect(toggle).to_have_attribute("aria-pressed", "false")
         self.page.wait_for_function("document.getElementById('bgMusic').paused")
         expect(self.page.locator(".audio-panel")).not_to_have_class(re.compile(r"\bis-playing\b"))
-        self.page.locator(".shot-button").first.click()
-        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Som desligado")
-        self.page.keyboard.press("Escape")
         self.assert_no_media_requests()
+        self.page.locator(".shot-button").first.click()
+        self.page.wait_for_function("window.__pendingPlayback.length === 1")
+        self.page.locator("#photoSoundToggle").click()
+        self.page.evaluate("window.__pendingPlayback.shift()()")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        expect(self.page.locator("#photoMusicStatus")).to_contain_text("Som desligado")
+        self.page.keyboard.press("ArrowRight")
+        self.assertEqual(self.page.evaluate("window.__pendingPlayback.length"), 0)
+        self.page.keyboard.press("Escape")
         self.assert_no_runtime_errors()
 
-    def test_background_continues_without_restarting_while_browsing_photos(self):
+    def test_direct_photo_previews_switch_on_swipe_and_restore_background_position(self):
         self.enter_with_mocked_music()
+        self.set_direct_photo_previews()
         self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 12.5)")
         before = self.background_snapshot()
         self.assertFalse(before["loop"], "The background excerpt must not loop.")
+        tracks = self.page.locator(".shot img").evaluate_all(
+            "images => images.slice(0, 2).map(image => image.dataset.trackId)"
+        )
         self.page.locator(".shot-button").first.click()
-        self.page.keyboard.press("ArrowRight")
-        self.page.keyboard.press("ArrowLeft")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.evaluate("track => { window.__swipeFirstAudio = __mediaMock.photo(track); }", tracks[0])
+        self.page.wait_for_function("document.getElementById('bgMusic').paused")
+        self.page.locator(".photo-stage").evaluate("""stage => {
+            const start = new Event('touchstart', {bubbles: true});
+            Object.defineProperty(start, 'touches', {value: [{clientX: 250, clientY: 200}]});
+            stage.dispatchEvent(start);
+            const end = new Event('touchend', {bubbles: true});
+            Object.defineProperty(end, 'changedTouches', {value: [{clientX: 100, clientY: 200}]});
+            stage.dispatchEvent(end);
+        }""")
+        expect(self.page.locator("#photoCounter")).to_have_text(re.compile(r"^02\s*/\s*09$"))
+        self.page.evaluate("track => { window.__swipeSecondAudio = __mediaMock.photo(track); }", tracks[1])
+        self.page.wait_for_function("__swipeFirstAudio.paused && !__swipeSecondAudio.paused")
         self.page.keyboard.press("Escape")
+        self.page.wait_for_function("__swipeSecondAudio.paused && !document.getElementById('bgMusic').paused")
         after = self.background_snapshot()
-        self.assertFalse(after["paused"], "Photo browsing must keep the chosen background playing.")
-        self.assertEqual(after["currentTime"], before["currentTime"], "Photo browsing must not seek the background.")
-        self.assertEqual(after["playCalls"], before["playCalls"], "Photo browsing must not restart playback.")
-        self.assertEqual(after["pauseCalls"], before["pauseCalls"], "Photo browsing must not interrupt playback.")
+        self.assertEqual(after["currentTime"], before["currentTime"], "Closing the photo album must preserve the background position.")
+        self.assertEqual(after["playCalls"], before["playCalls"] + 1)
         self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
     def test_matching_photo_reuses_the_full_background_and_its_saved_position(self):
         self.enter_with_mocked_music(background_duration=290.325)
+        self.set_direct_photo_previews()
         self.page.evaluate("""() => {
             window.__sharedBackground = __mediaMock.background();
             __mediaMock.setTime(__sharedBackground, 65.25);
@@ -671,13 +716,18 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(resumed["currentTime"], 65.25, "The matching photo must continue the full song rather than restart it.")
         self.assertEqual(resumed["playCalls"], before["playCalls"] + 1)
         self.page.keyboard.press("ArrowRight")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.wait_for_function("__sharedBackground.paused")
         self.page.keyboard.press("ArrowLeft")
+        self.page.wait_for_function("!__sharedBackground.paused && __sharedBackground.volume >= 0.45")
         self.page.keyboard.press("Escape")
         after = self.background_snapshot()
         self.assertFalse(after["paused"])
-        self.assertEqual(after["playCalls"], resumed["playCalls"], "Photo navigation must keep the shared audio playing.")
+        self.assertEqual(after["currentTime"], 65.25, "Returning to the matching photo must resume the full song's saved position.")
+        self.assertEqual(after["playCalls"], resumed["playCalls"] + 1)
         self.assertTrue(self.page.evaluate("__sharedBackground === document.getElementById('bgMusic')"))
-        self.assertEqual(self.page.evaluate("window.__createdAudioCount"), 0, "The full song must not acquire a second audio element.")
+        self.assertEqual(self.page.evaluate("window.__createdAudioCount"), 1,
+                         "Only the different photo's excerpt may acquire another audio element.")
         self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
@@ -763,7 +813,9 @@ class SiteTests(unittest.TestCase):
                 self.assertGreater(paused_at, 31)
                 page.locator("#photoListenBtn").click()
                 page.wait_for_function("!__fullBackground.paused && __fullBackground.currentTime > " + str(paused_at + 0.2))
-                page.keyboard.press("ArrowRight")
+                page.keyboard.press("Escape")
+                page.locator('.shot-button:has(img[data-track-id="445019772"])').click()
+                expect(page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
                 page.keyboard.press("Escape")
                 self.assertTrue(audio.evaluate("element => element === __fullBackground && !element.paused && element.currentTime > 31 && !element.ended && !element.loop"))
                 self.assertEqual(page.evaluate("__realMediaProbe.createdAudio"), 0)
@@ -800,16 +852,17 @@ class SiteTests(unittest.TestCase):
 
     def test_finished_background_stays_finished_until_an_explicit_replay(self):
         self.enter_with_mocked_music()
+        self.page.locator("#finalSurpriseEnvelope > summary").click()
+        self.page.locator(".final-surprise-photo-button").first.click()
         self.page.evaluate("__mediaMock.finish(__mediaMock.background())")
         expect(self.page.locator("#soundToggle")).to_have_attribute("aria-pressed", "false")
         finished = self.background_snapshot()
         self.assertTrue(finished["ended"])
-        self.page.locator(".shot-button").first.click()
         self.page.keyboard.press("ArrowRight")
         self.page.keyboard.press("Escape")
         self.page.evaluate("__mediaMock.setHidden(true); __mediaMock.setHidden(false)")
         after_browsing = self.background_snapshot()
-        self.assertTrue(after_browsing["paused"], "Browsing and returning to the page must not replay an ended track.")
+        self.assertTrue(after_browsing["paused"], "Moving between photos sharing an ended song must not replay it.")
         self.assertTrue(after_browsing["ended"])
         self.assertEqual(after_browsing["currentTime"], finished["currentTime"])
         self.assertEqual(after_browsing["playCalls"], finished["playCalls"])
@@ -821,12 +874,12 @@ class SiteTests(unittest.TestCase):
         self.assertFalse(replayed["ended"])
         self.assert_no_runtime_errors()
 
-    def test_photo_music_continues_during_navigation_and_closing_restores_background_position(self):
+    def test_photo_music_crossfades_on_navigation_and_closing_restores_background_position(self):
         requested_tracks = self.mock_available_previews()
         self.enter_with_mocked_music()
+        self.remove_direct_photo_previews()
         self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 16.75)")
         self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
         track = self.page.locator(".shot img").first.get_attribute("data-track-id")
         self.page.evaluate("track => { window.__activePhoto = __mediaMock.photo(track); }", track)
@@ -838,11 +891,17 @@ class SiteTests(unittest.TestCase):
         self.page.evaluate("__mediaMock.setTime(__activePhoto, 6.5)")
         photo = self.page.evaluate("__mediaMock.snapshot(__activePhoto)")
         self.page.locator("#photoNext").click()
-        self.assertFalse(self.page.evaluate("__activePhoto.paused"), "Navigation must preserve the currently chosen photo music.")
+        next_track = self.page.locator(".shot img").nth(1).get_attribute("data-track-id")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.evaluate("track => { window.__nextPhoto = __mediaMock.photo(track); }", next_track)
+        self.page.wait_for_function("__activePhoto.paused && !__nextPhoto.paused && __nextPhoto.volume >= 0.6")
         self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__activePhoto).playCalls"), photo["playCalls"])
         self.assertEqual(self.page.evaluate("__activePhoto.currentTime"), 6.5)
-        self.assertEqual(requested_tracks, [track], "Navigation must not fetch or play the next photo track.")
-        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.assertEqual(requested_tracks, [track, next_track])
+        next_values = self.page.evaluate("__mediaMock.snapshot(__nextPhoto).volumeSamples.map(sample => sample.value)")
+        self.assertTrue(any(0 < value < 0.5 for value in next_values), "The next memory's music must also fade in.")
+        self.page.locator("#photoPrev").click()
+        self.page.wait_for_function("__nextPhoto.paused && !__activePhoto.paused")
         self.page.locator("#photoSoundToggle").click()
         self.page.wait_for_function("__activePhoto.paused")
         self.page.locator("#photoSoundToggle").click()
@@ -858,12 +917,12 @@ class SiteTests(unittest.TestCase):
     def test_closing_photo_respects_an_explicitly_paused_background(self):
         self.mock_available_previews()
         self.enter_with_mocked_music()
+        self.remove_direct_photo_previews()
         self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 11.25)")
         self.page.locator("#musicPlayBtn").click()
         self.page.wait_for_function("document.getElementById('bgMusic').paused")
         paused_background = self.background_snapshot()
         self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
         self.page.keyboard.press("Escape")
         self.page.wait_for_function("__mediaMock.allPaused()")
@@ -877,8 +936,8 @@ class SiteTests(unittest.TestCase):
     def test_finished_photo_does_not_loop_or_restart_the_background_on_its_own(self):
         self.mock_available_previews()
         self.enter_with_mocked_music()
+        self.remove_direct_photo_previews()
         self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
         track = self.page.locator(".shot img").first.get_attribute("data-track-id")
         self.page.evaluate("track => { window.__finishedPhoto = __mediaMock.photo(track); }", track)
@@ -890,6 +949,14 @@ class SiteTests(unittest.TestCase):
         self.assertTrue(self.page.evaluate("__finishedPhoto.paused && __finishedPhoto.ended && !__finishedPhoto.loop"))
         self.assertTrue(self.background_snapshot()["paused"], "The end of a photo excerpt must stay quiet.")
         self.assertEqual(self.background_snapshot()["playCalls"], background["playCalls"])
+        finished_play_calls = self.page.evaluate("__mediaMock.snapshot(__finishedPhoto).playCalls")
+        self.page.keyboard.press("ArrowRight")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.page.keyboard.press("ArrowLeft")
+        expect(self.page.locator("#photoMusicStatus")).to_contain_text("O trecho terminou")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        self.assertEqual(self.page.evaluate("__mediaMock.snapshot(__finishedPhoto).playCalls"), finished_play_calls,
+                         "Returning with an arrow must not replay an excerpt that already ended.")
         self.page.locator("#photoListenBtn").click()
         expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
         self.assertEqual(self.page.evaluate("__finishedPhoto.currentTime"), 0,
@@ -956,10 +1023,10 @@ class SiteTests(unittest.TestCase):
 
         self.page.route("https://api.deezer.com/**", delayed_preview)
         self.enter_with_mocked_music()
+        self.remove_direct_photo_previews()
         before = self.background_snapshot()
         track = self.page.locator(".shot img").first.get_attribute("data-track-id")
         self.page.locator(".shot-button").first.click()
-        self.page.locator("#photoListenBtn").click()
         self.page.wait_for_function("typeof window.__deliverLatePreview === 'function'")
         self.page.keyboard.press("Escape")
         self.page.evaluate("window.__deliverLatePreview()")
@@ -970,6 +1037,42 @@ class SiteTests(unittest.TestCase):
         self.assertFalse(after["paused"])
         self.assertEqual(after["playCalls"], before["playCalls"])
         expect(self.page.locator(".shot").first).not_to_have_class(re.compile(r"\bplaying\b"))
+        self.assert_no_runtime_errors()
+
+    def test_only_the_latest_photo_preview_can_start_after_rapid_navigation(self):
+        def delayed_preview(route):
+            self.external_requests.append(route.request.url)
+            track = urlparse(route.request.url).path.rsplit("/", 1)[-1]
+            callback = parse_qs(urlparse(route.request.url).query).get("callback", [""])[0]
+            self.assertRegex(track, r"^\d+$")
+            self.assertRegex(callback, r"^surprisePreview_[A-Za-z0-9_]+$")
+            route.fulfill(
+                content_type="application/javascript",
+                body=f'window.__pendingPhotoPreviews ||= {{}}; window.__pendingPhotoPreviews["{track}"] = () => {callback}({{"preview":"https://cdnt-preview.dzcdn.net/preview-{track}.mp3"}});',
+            )
+
+        self.page.route("https://api.deezer.com/**", delayed_preview)
+        self.enter_with_mocked_music()
+        self.remove_direct_photo_previews()
+        tracks = self.page.locator(".shot img").evaluate_all(
+            "images => images.slice(0, 2).map(image => image.dataset.trackId)"
+        )
+        self.page.locator(".shot-button").first.click()
+        self.page.wait_for_function("track => typeof window.__pendingPhotoPreviews?.[track] === 'function'", arg=tracks[0])
+        self.page.keyboard.press("ArrowRight")
+        self.page.wait_for_function("track => typeof window.__pendingPhotoPreviews?.[track] === 'function'", arg=tracks[1])
+        self.page.evaluate("track => window.__pendingPhotoPreviews[track]()", tracks[1])
+        expect(self.page.locator(".shot").nth(1)).to_have_class(re.compile(r"\bplaying\b"))
+        self.page.evaluate("track => window.__pendingPhotoPreviews[track]()", tracks[0])
+        self.page.wait_for_timeout(100)
+        self.assertTrue(self.page.evaluate("track => !__mediaMock.photo(track)", tracks[0]),
+                        "A late response for the previous photo must not create or play its audio.")
+        self.page.locator("#photoSoundToggle").click()
+        self.page.keyboard.press("ArrowLeft")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "false")
+        self.page.keyboard.press("Escape")
+        self.assertTrue(self.background_snapshot()["paused"], "Muting the dialog must prevent background revival on close.")
         self.assert_no_runtime_errors()
 
     def test_keepsake_quotes_are_accessible_and_do_not_repeat_immediately(self):
@@ -1222,7 +1325,7 @@ class SiteTests(unittest.TestCase):
         summary.press("Enter")
         expect(envelope).to_have_attribute("open", "")
         expect(body).to_be_visible()
-        images = envelope.locator(".final-surprise-photo > img")
+        images = envelope.locator(".final-surprise-photo img")
         expect(images).to_have_count(3)
         filenames = images.evaluate_all(r"""elements => elements.map(image => {
             const pathname = new URL(image.currentSrc || image.src).pathname;
@@ -1249,7 +1352,7 @@ class SiteTests(unittest.TestCase):
         summary.press("Enter")
         expect(envelope).to_have_attribute("open", "")
         expect(body).to_be_visible()
-        images = envelope.locator(".final-surprise-photo > img")
+        images = envelope.locator(".final-surprise-photo img")
         expect(images).to_have_count(3)
         for index in range(3):
             with self.subTest(photo=index + 1):
@@ -1276,7 +1379,7 @@ class SiteTests(unittest.TestCase):
         summary.focus()
         summary.press("Enter")
         expect(envelope).to_have_attribute("open", "")
-        images = envelope.locator(".final-surprise-photo > img")
+        images = envelope.locator(".final-surprise-photo img")
         expect(images).to_have_count(3)
         for index in range(3):
             with self.subTest(photo=index + 1):
@@ -1312,6 +1415,96 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(after["currentTime"], before["currentTime"])
         self.assertEqual(after["playCalls"], before["playCalls"])
         self.assertEqual(after["pauseCalls"], before["pauseCalls"])
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_final_surprise_album_plays_the_shared_full_song_without_restarting_on_navigation(self):
+        self.mock_immediate_playback(background_duration=290.325)
+        self.enter_quietly()
+        self.page.locator("#finalSurpriseEnvelope > summary").click()
+        self.assert_no_media_requests()
+        buttons = self.page.locator(".final-surprise-photo-button")
+        expect(buttons).to_have_count(3)
+        sources = buttons.locator("img").evaluate_all("images => images.map(image => image.src)")
+        first = buttons.first
+        first.click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        expect(self.page.locator("#photoCounter")).to_have_text(re.compile(r"^01\s*/\s*03$"))
+        self.assert_current_photo(sources[0])
+        self.page.evaluate("__mediaMock.setTime(__mediaMock.background(), 42.25)")
+        before = self.background_snapshot()
+        for key, index in (("ArrowRight", 1), ("ArrowRight", 2), ("ArrowRight", 0), ("ArrowLeft", 2)):
+            self.page.keyboard.press(key)
+            self.assert_current_photo(sources[index])
+            expect(self.page.locator("#photoCounter")).to_have_text(re.compile(rf"^0{index + 1}\s*/\s*03$"))
+            expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        after = self.background_snapshot()
+        self.assertEqual(after["currentTime"], before["currentTime"])
+        self.assertEqual(after["playCalls"], before["playCalls"], "Photos sharing the full song must keep the same playback session.")
+        self.assertEqual(after["pauseCalls"], before["pauseCalls"])
+        self.assertEqual(self.page.evaluate("window.__createdAudioCount"), 0)
+        self.assertTrue(self.page.locator("#photoTrackLink").evaluate(
+            "link => link.href === document.getElementById('bgMusic').src"
+        ))
+        self.page.keyboard.press("Escape")
+        expect(first).to_be_focused()
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        buttons.nth(1).click()
+        expect(self.page.locator("#photoListenBtn")).to_have_attribute("aria-pressed", "true")
+        self.assertEqual(self.background_snapshot()["currentTime"], 42.25)
+        self.assertEqual(self.background_snapshot()["playCalls"], before["playCalls"] + 1)
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_function("__mediaMock.allPaused()")
+        self.assert_no_media_requests()
+        self.assert_no_runtime_errors()
+
+    def test_chapter_menu_fits_a_phone_and_closes_after_keyboard_or_shortcut_actions(self):
+        self.page.set_viewport_size({"width": 320, "height": 720})
+        self.enter_quietly()
+        menu = self.page.locator("#chapterMenu")
+        summary = menu.locator(":scope > summary")
+        panel = self.page.locator("#chapterMenuPanel")
+        expect(summary).to_have_attribute("aria-controls", "chapterMenuPanel")
+        self.assertFalse(menu.evaluate("element => element.open"))
+        expect(panel).not_to_be_visible()
+        summary.focus()
+        summary.press("Enter")
+        expect(panel).to_be_visible()
+        valid_shortcuts = panel.evaluate("""element => {
+            const links = [...element.querySelectorAll('a[href^="#"]')];
+            return links.length > 0 && links.every(link => {
+                const id = decodeURIComponent(link.hash.slice(1));
+                return id.length > 0 && document.getElementById(id);
+            });
+        }""")
+        self.assertTrue(valid_shortcuts, "Every chapter shortcut must lead to an existing section.")
+        self.assert_dialog_fits(panel)
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth - innerWidth"), 1)
+        panel.locator("a").first.focus()
+        self.page.keyboard.press("Escape")
+        self.assertFalse(menu.evaluate("element => element.open"))
+        expect(panel).not_to_be_visible()
+        expect(summary).to_be_focused()
+        summary.press("Enter")
+        self.page.locator("#soundToggle").focus()
+        self.page.keyboard.press("Escape")
+        self.assertFalse(menu.evaluate("element => element.open"))
+        expect(summary).to_be_focused()
+        summary.press("Enter")
+        shortcut = panel.locator('a[href="#presente"]')
+        target = shortcut.get_attribute("href")
+        shortcut.click()
+        self.page.wait_for_function("hash => location.hash === hash", arg=target)
+        self.assertFalse(menu.evaluate("element => element.open"))
+        expect(self.page.locator("#presente").locator("h1, h2, h3").first).to_be_focused()
+        gift_links = self.page.locator('.chapter-nav a[href="#presente"]')
+        expect(gift_links).to_have_count(2)
+        for index in range(2):
+            expect(gift_links.nth(index)).to_have_attribute("aria-current", "location")
+        summary.click()
+        expect(panel).to_be_visible()
+        self.page.mouse.click(3, self.page.viewport_size["height"] - 10)
+        self.assertFalse(menu.evaluate("element => element.open"))
         self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
