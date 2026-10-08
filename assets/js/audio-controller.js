@@ -5,6 +5,9 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  // 50 ms of unsigned 8-bit PCM silence, not an audible extra track.
+  const preparationSource = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
   function createController(options = {}) {
     const requestFrame = options.requestFrame || (callback => requestAnimationFrame(callback));
     const cancelFrame = options.cancelFrame || (id => cancelAnimationFrame(id));
@@ -259,11 +262,13 @@
       audio.preload = 'none';
       audio.removeAttribute?.('crossorigin');
       const entry = { key, kind, trackId, audio, level, gain: 0, fade: null,
-        status: 'idle', error: null, timer: null, listeners: [], output: null, outputAttempted: false };
+        status: 'idle', error: null, timer: null, listeners: [], output: null, outputAttempted: false,
+        source: null, prepared: false, preparing: false, preparationAttempted: false, preparationRevision: 0 };
       tracks.set(key, entry);
       function listen(name, handler) {
-        audio.addEventListener(name, handler);
-        entry.listeners.push([name, handler]);
+        const listener = event => { if (!entry.preparing) handler(event); };
+        audio.addEventListener(name, listener);
+        entry.listeners.push([name, listener]);
       }
       listen('playing', () => startPlaying(entry));
       listen('waiting', () => {
@@ -389,6 +394,7 @@
     function pause({ immediate = false } = {}) {
       revision += 1;
       desired = false;
+      cancelPreparation();
       fallback = null;
       cancelFades();
       for (const entry of tracks.values()) {
@@ -398,9 +404,28 @@
       }
       notify();
     }
+    function cancelPending() {
+      if (destroyed || active?.status !== 'loading') return;
+      revision += 1;
+      const pending = active;
+      clearPlaybackTimer(pending);
+      pending.fade = null;
+      pending.status = 'paused';
+      pending.gain = 0;
+      active = [...tracks.values()].find(entry => entry !== pending && !entry.audio.paused
+        && entry.status === 'playing' && entry.gain > 0) || null;
+      fallback = null;
+      // Keep the already audible track, while stale media promises are silenced.
+      for (const entry of tracks.values()) if (entry.fade) entry.fade.token = revision;
+      pending.audio.pause();
+      applyVolume(pending);
+      if (active) fade(active, active.level, fadeDuration);
+      notify();
+    }
     function suspend() {
       revision += 1;
       suspended = true;
+      cancelPreparation();
       fallback = null;
       cancelFades();
       for (const entry of tracks.values()) {
@@ -415,13 +440,56 @@
       notify();
       return Promise.resolve(false);
     }
-    function playPhoto(trackId, source, settings) {
+    function photoEntry(trackId) {
       const key = 'photo:' + trackId;
       let entry = tracks.get(key);
       if (!entry) {
         const audio = makeAudio();
-        audio.src = source;
         entry = register(key, 'photo', String(trackId), audio, options.photoVolume ?? 0.65);
+      }
+      return entry;
+    }
+    function cancelPreparation() {
+      for (const entry of tracks.values()) {
+        if (!entry.preparing) continue;
+        entry.preparationRevision += 1;
+        entry.preparing = false;
+        entry.audio.pause();
+        entry.gain = 0;
+        applyVolume(entry);
+      }
+    }
+    function preparePhoto(trackId) {
+      if (destroyed || suspended || !sequentialTransitions || !/^\d+$/.test(String(trackId))) return;
+      const entry = photoEntry(trackId);
+      if (entry.source || entry.prepared || entry.preparing) return;
+      const token = ++entry.preparationRevision;
+      entry.preparationAttempted = true;
+      entry.preparing = true;
+      entry.audio.src = preparationSource;
+      entry.gain = 0;
+      applyVolume(entry);
+      const finish = success => {
+        if (token !== entry.preparationRevision || !entry.preparing || entry.source) return;
+        entry.prepared = success;
+        entry.preparing = false;
+        entry.audio.pause();
+      };
+      try { Promise.resolve(entry.audio.play()).then(() => finish(true), () => finish(false)); }
+      catch { finish(false); }
+    }
+    function playPhoto(trackId, source, settings) {
+      if (destroyed) return Promise.resolve(false);
+      const entry = photoEntry(trackId);
+      if (!entry.source) {
+        const wasPrepared = entry.preparationAttempted;
+        entry.preparationRevision += 1;
+        entry.preparing = false;
+        entry.audio.pause();
+        entry.audio.src = source;
+        entry.source = source;
+        entry.status = 'idle';
+        if (wasPrepared) entry.audio.load?.();
       }
       return select(entry, settings);
     }
@@ -440,7 +508,8 @@
       tracks.clear();
     }
     return {
-      playBackground: settings => select(background, settings), playPhoto, pause, suspend,
+      playBackground: settings => select(background, settings), playPhoto, preparePhoto, cancelPreparation,
+      pause, cancelPending, suspend,
       resumeFromSuspension, resume: settings => select(active || background, settings),
       getState: snapshot, destroy
     };

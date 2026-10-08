@@ -28,5 +28,6 @@ jobs:
       - run: node --check assets/js/audio-controller.js
       - run: node --check assets/js/details.js
       - run: node --check assets/js/chapters.js
+      - run: node --check assets/js/navigation.js
       - run: node --test tests/*.test.cjs
       - run: python -m unittest discover -s tests -p 'test_*.py' -v

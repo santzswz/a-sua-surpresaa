@@ -693,3 +693,132 @@ test('an interrupted context that never resumes times out even while media remai
   assert.equal(background.currentTime, 24.5);
   controller.destroy();
 });
+
+test('canceling a pending photo keeps audible background and prevents a stale photo from starting', async () => {
+  const { controller, background, photos, clock } = fixture();
+  await controller.playBackground();
+  clock.advance(900);
+  background.currentTime = 10.5;
+  const backgroundPauseCount = background.pauseTransitions;
+  const oldPhoto = controller.playPhoto('old', 'preview-old');
+  // Its initial synchronous play is complete, so force a buffering request.
+  const photo = photos[0];
+  photo.deferred = true;
+  photo.dispatchEvent(new Event('waiting'));
+  controller.cancelPending();
+  assert.equal(background.paused, false);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  assert.equal(controller.getState().target, 'background');
+  photo.paused = false;
+  photo.dispatchEvent(new Event('playing'));
+  assert.equal(photo.paused, true);
+  assert.equal(await oldPhoto, false);
+  clock.advance(900);
+  assert.equal(background.pauseTransitions, backgroundPauseCount);
+  assert.equal(background.currentTime, 10.5);
+  assert.equal(controller.getState().backgroundPlaying, true);
+  controller.destroy();
+});
+
+test('canceling deferred media before the next selection cannot revive the old photo', async () => {
+  const { controller, photos, clock } = fixture({ deferred: true });
+  const oldPhoto = controller.playPhoto('old', 'preview-old');
+  controller.cancelPending();
+  const newPhoto = controller.playPhoto('new', 'preview-new');
+  photos[1].pending[0].resolve();
+  assert.equal(await newPhoto, true);
+  photos[0].pending[0].resolve();
+  assert.equal(await oldPhoto, false);
+  clock.advance(900);
+  assert.equal(photos[0].paused, true);
+  assert.equal(photos[1].paused, false);
+  assert.equal(controller.getState().trackId, 'new');
+  controller.destroy();
+});
+
+test('iOS photo preparation contains only silence and reuses the element for its actual track', async () => {
+  const { controller, photos, background } = fixture({ sequentialTransitions: true, volumeUnsupported: true });
+  controller.preparePhoto('123');
+  const photo = photos[0];
+  const pcm = Buffer.from(photo.src.split(',')[1], 'base64');
+  assert.equal(pcm.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(pcm.readUInt32LE(4) + 8, pcm.length, 'The silent WAV must remain valid.');
+  assert.equal(pcm.readUInt16LE(34), 8);
+  assert.equal(pcm.readUInt32LE(40), 400);
+  assert.ok(pcm.subarray(44).every(value => value === 128), 'All PCM samples must be digital silence.');
+  assert.equal(controller.getState().playing, false, 'Preparation must not appear as a playing photo.');
+  await Promise.resolve();
+  assert.equal(photo.paused, true);
+  assert.equal(await controller.playPhoto('123', 'preview-123'), true);
+  assert.equal(photos.length, 1);
+  assert.equal(photo.src, 'preview-123');
+  assert.equal(photo.loadCalls, 1);
+  assert.equal(photo.playCalls, 2);
+  assert.equal(background.playCalls, 0);
+  photo.metadata();
+  photo.currentTime = 7.25;
+  controller.pause({ immediate: true });
+  controller.preparePhoto('123');
+  await controller.playPhoto('123', 'preview-123');
+  assert.equal(photo.currentTime, 7.25);
+  assert.equal(photo.loadCalls, 1, 'An already loaded song must keep its saved position.');
+  controller.destroy();
+});
+
+test('late silence completion cannot pause the actual photo track', async () => {
+  const { controller, photos } = fixture({ deferred: true, sequentialTransitions: true });
+  controller.preparePhoto('123');
+  const photo = photos[0];
+  const playback = controller.playPhoto('123', 'preview-123');
+  photo.pending[1].resolve();
+  assert.equal(await playback, true);
+  photo.currentTime = 4.25;
+  photo.pending[0].resolve();
+  await Promise.resolve();
+  assert.equal(photo.paused, false);
+  assert.equal(photo.currentTime, 4.25);
+  assert.equal(controller.getState().trackId, '123');
+  assert.equal(photos.length, 1);
+  controller.destroy();
+});
+
+test('canceling photo preparation silences its delayed playback without changing the current selection', async () => {
+  const { controller, photos, background } = fixture({ deferred: true, sequentialTransitions: true });
+  controller.preparePhoto('123');
+  const photo = photos[0];
+  controller.cancelPreparation();
+  photo.pending[0].resolve();
+  await Promise.resolve();
+  assert.equal(photo.paused, true);
+  assert.equal(controller.getState().target, null);
+  assert.equal(controller.getState().playing, false);
+  assert.equal(background.playCalls, 0);
+  const playback = controller.playPhoto('123', 'preview-123');
+  assert.equal(photo.loadCalls, 1, 'A canceled silent resource must not leave its old ended/error state.');
+  photo.pending[1].resolve();
+  assert.equal(await playback, true);
+  controller.destroy();
+});
+
+test('mute cancels preparation and the following real media promise', async () => {
+  const { controller, photos } = fixture({ deferred: true, sequentialTransitions: true });
+  controller.preparePhoto('123');
+  const photo = photos[0];
+  const playback = controller.playPhoto('123', 'preview-123');
+  controller.pause({ immediate: true });
+  photo.pending[0].resolve();
+  photo.pending[1].resolve();
+  assert.equal(await playback, false);
+  await Promise.resolve();
+  assert.equal(photo.paused, true);
+  assert.equal(controller.getState().desired, false);
+  assert.equal(controller.getState().playing, false);
+  controller.destroy();
+});
+
+test('native-volume browsers do not need a silent preparation resource', () => {
+  const { controller, photos } = fixture();
+  controller.preparePhoto('123');
+  assert.equal(photos.length, 0);
+  controller.destroy();
+});
