@@ -33,14 +33,14 @@
   <div class="experience-progress reading-progress" aria-hidden="true"><span id="experienceProgress"></span></div><nav class="nav" aria-label="Navegação principal">
     <a class="brand" href="#inicio">Sua surpresa ♥</a>
     <div class="navlinks chapter-nav">
-      <a class="nav-direct" href="#carta">Carta</a><a class="nav-direct" href="#fotos">Memórias</a><a class="nav-direct" href="#presente">Presente</a>
+      <a class="nav-direct" href="#carta">Carta</a><a class="nav-direct" href="#fotos">Memórias</a><a class="nav-direct" href="#acesso">QR code</a>
       <details class="chapter-menu" id="chapterMenu">
         <summary aria-controls="chapterMenuPanel">Explorar <span aria-hidden="true">⌄</span></summary>
         <div class="chapter-menu-panel" id="chapterMenuPanel">
           <div class="chapter-menu-label">o seu dia</div>
           <a href="#aniversario">Feliz aniversário, amor</a><a href="#tempo">Nosso tempo juntos</a><a href="#carta">Uma carta pra você</a><a href="#carinho">Um carinho pra guardar</a>
           <div class="chapter-menu-label">a nossa história</div>
-          <a href="#linha-do-tempo">Nossa linha do tempo</a><a href="#musica">A nossa música</a><a href="#presente">Seu presente</a><a href="#fotos">Galeria de memórias</a><a href="#amo-em-voce">O que eu amo em você</a>
+          <a href="#linha-do-tempo">Nossa linha do tempo</a><a href="#musica">A nossa música</a><a href="#acesso">QR da surpresa</a><a href="#fotos">Galeria de memórias</a><a href="#amo-em-voce">O que eu amo em você</a>
           <div class="chapter-menu-label">mais um pouco de nós</div>
           <a href="#abra-quando">Cartas “Abra quando…”</a><a href="#vales">Vales de carinho</a><a href="#quiz-do-casal">Quiz do casal</a><a href="#proximos-destinos">Nossos próximos planos</a><a href="#segredo">Uma mensagem escondida</a><a href="#final">Pra terminar, amor</a><a href="#ultima-surpresa">A última surpresa</a>
         </div>
@@ -328,45 +328,20 @@
             <a class="music-full-link" href="https://www.youtube.com/results?search_query=Baco+Exu+do+Blues+Te+Amo+Disgraca+oficial" target="_blank" rel="noopener noreferrer">Te Amo Disgraça no YouTube <svg class="icon-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M7 7h10v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
           </article>
 
-          <article class="gift-card reveal gift-card-upgraded" id="presente">
+          <article class="qr-card reveal" id="acesso" aria-labelledby="qrTitle">
             <div>
-              <div class="gift-top"><div><div class="eyebrow" style="margin:0">um presente que é seu</div><h3>Escolha o que você quiser.</h3></div><div class="gift-icon">🎁</div></div>
-              <p>Eu queria que uma parte do seu presente fosse liberdade para escolher exatamente o que você quiser. Sem precisar me perguntar se pode, sem culpa e sem regra.</p>
-
-              <div class="balance gift-balance" id="giftBalance">
-                <div class="balance-head">
-                  <small id="balanceLabel">Saldo do seu presente</small>
-                  <button class="balance-eye" id="balanceEye" type="button" aria-controls="balanceValue prankCopy realBalanceBtn realBalanceMessage" aria-label="Mostrar saldo" aria-pressed="false">
-                    <svg class="eye-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg>
-                    <svg class="eye-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 3 18 18M10.6 6.2A11.6 11.6 0 0 1 12 6c6.5 0 10 6 10 6-3.5 6-10 6S2 12 2 12s3.5-6 10-6Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m3 3 18 18M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                  </button>
-                </div>
-
-                <strong class="balance-value" id="balanceValue">R$ ••••</strong>
-                <div class="prank-copy" id="prankCopy" aria-live="polite"></div>
-
-                <button class="real-balance-btn" id="realBalanceBtn" type="button" aria-controls="realBalanceMessage balanceValue" hidden>
-                  achou mesmo que era só isso? 😭
-                </button>
-
-                <div class="real-balance-message" id="realBalanceMessage" role="status" aria-live="polite" hidden>
-                  <span>agora sim ♥</span>
-                  <p><strong>R$ 200,00</strong> para gastar com o que você quiser. É seu. Escolhe alguma coisa que te faça feliz.</p>
-                </div>
-              </div>
-
-              <div class="physical-gift-tease">
-                <span>✦</span>
-                <p>E isso ainda não é tudo. Tem presente que eu preferi não colocar numa tela.</p>
-              </div>
+              <div class="eyebrow">pra voltar quando quiser</div>
+              <h3 id="qrTitle">Guarda esse caminho.</h3>
+              <p>Aponta a câmera. Tem um pouco de nós esperando aqui.</p>
             </div>
-
-            <div class="shops" aria-label="Lojas virtuais">
-              <a class="shop" href="https://www.mercadolivre.com.br/" target="_blank" rel="noopener">Mercado Livre <svg class="icon-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M7 7h10v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-              <a class="shop" href="https://www.amazon.com.br/" target="_blank" rel="noopener">Amazon <svg class="icon-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M7 7h10v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-              <a class="shop" href="https://shopee.com.br/" target="_blank" rel="noopener">Shopee <svg class="icon-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M7 7h10v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-              <a class="shop" href="https://br.shein.com/" target="_blank" rel="noopener">SHEIN <svg class="icon-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M7 7h10v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+            <a class="qr-image" href="https://santzswz.github.io/a-sua-surpresaa/" aria-label="Abrir Sua surpresa">
+              <img id="siteQr" src="./assets/qr/sua-surpresa.svg" alt="QR code para abrir Sua surpresa" width="1080" height="1080" loading="lazy" decoding="async">
+            </a>
+            <div class="qr-downloads">
+              <a class="btn primary" href="./assets/qr/sua-surpresa.png" download="sua-surpresa-qr.png">Baixar QR code</a>
+              <a class="btn soft" href="./assets/qr/sua-surpresa.svg" download="sua-surpresa-qr.svg">Versão para imprimir</a>
             </div>
+            <small class="qr-note">Guarda no celular ou imprime pra ter por perto.</small>
           </article>
         </div>
       </div>

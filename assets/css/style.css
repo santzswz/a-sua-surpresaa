@@ -30,9 +30,8 @@
 /* Timeline like margin notes of a book. */
 .timeline-wrap{display:grid;grid-template-columns:.9fr 1.1fr;align-items:start;gap:85px}.timeline-intro{position:sticky;top:115px}.timeline-intro h2,.reasons-head h2{margin-top:16px}.timeline-intro p,.reasons-head p{margin:23px 0 0;color:var(--muted);font-size:15px;line-height:1.85}.love-timeline{position:relative;padding-left:30px}.love-timeline::before{content:"";position:absolute;left:4px;top:11px;bottom:30px;width:1px;background:linear-gradient(var(--rose),#d8b6b4,var(--gold))}.timeline-event{position:relative;margin-bottom:31px}.timeline-event:last-child{margin-bottom:0}.timeline-event::before{content:"";position:absolute;left:-31px;top:8px;width:11px;height:11px;border:2px solid var(--rose);border-radius:50%;background:var(--bg)}.timeline-event article{padding:0 0 27px;border-bottom:1px solid var(--line)}.timeline-date{color:var(--wine2);font-size:9px;line-height:1.7;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.timeline-event h3{margin:11px 0 15px;font:600 clamp(24px,2.5vw,31px)/1.22 var(--serif);color:var(--wine);letter-spacing:-.03em}.timeline-event p{margin:0;color:var(--muted);line-height:1.85;font-size:14px}
 
-/* Music and the gift share a spread. */
-.music{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:stretch}.music-card,.gift-card{position:relative;min-width:0;overflow:hidden;border-radius:var(--radius);padding:clamp(27px,3.4vw,43px)}.music-card{color:var(--paper);background:var(--wine)}.music-card::after{content:"";position:absolute;bottom:-120px;right:-95px;width:270px;height:270px;border:1px solid rgba(255,255,255,.07);border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 4px,rgba(255,255,255,.04) 5px 6px);pointer-events:none}.music-card .mini{color:#d3a6b5;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.17em}.music-card h3{margin:22px 0 13px;font:600 clamp(40px,4.5vw,60px)/1.1 var(--serif);letter-spacing:-.04em}.music-card>p{margin:0 0 30px;color:#d2b7c2;line-height:1.75;font-size:15px}.audio-panel{position:relative;z-index:1;display:flex;align-items:center;gap:15px;padding:21px 17px;margin:27px 0 18px;border:1px solid rgba(255,255,255,.18);border-radius:13px;background:rgba(255,255,255,.055)}.audio-disc{flex:0 0 48px;width:48px;height:48px;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:var(--paper);color:var(--wine);font-size:16px}.audio-copy{display:flex;flex-direction:column;min-width:0}.audio-copy strong{font:600 20px var(--serif)}.audio-copy small{margin-top:6px;color:#d2b5bf;font-size:11px}.eq{display:flex;flex:0 0 auto;align-items:center;gap:3px;height:29px;margin-left:auto}.eq i{width:3px;height:10px;border-radius:2px;background:#d8b19c;animation:equalizer 1s ease-in-out infinite;animation-play-state:paused}.eq i:nth-child(2){height:24px;animation-delay:.2s}.eq i:nth-child(3){height:16px;animation-delay:.4s}.eq i:nth-child(4){height:29px;animation-delay:.6s}.audio-panel.is-playing .eq i{animation-play-state:running}.music-card .music-status{margin:0;color:#ecd6df;font-size:12px;min-height:42px}.music-note{margin-top:17px;color:#caabb7;font-size:11px;line-height:1.7}.music-full-link{display:inline-block;margin-top:21px;padding-bottom:6px;border-bottom:1px solid #a77a8b;color:#f3e3dd;font-size:11px}
-.gift-card{display:flex;flex-direction:column;justify-content:space-between;gap:28px;background:#f1e2df;border:1px solid var(--line)}.gift-top{display:flex;align-items:start;justify-content:space-between;gap:18px}.gift-top .eyebrow{font-size:9px;line-height:1.7}.gift-card h3{margin:20px 0 15px;color:var(--wine);font:600 clamp(29px,3.1vw,39px)/1.13 var(--serif);letter-spacing:-.035em}.gift-card p{margin:0;color:var(--muted);line-height:1.85;font-size:14px}.gift-icon{display:grid;place-items:center;width:45px;height:45px;flex:0 0 45px;border-radius:50%;background:rgba(255,252,247,.65);font-size:22px}.balance{margin:28px 0 22px;padding:23px;background:var(--paper);border:1px solid var(--line);border-radius:15px}.balance-head{display:flex;align-items:center;justify-content:space-between;gap:15px}.balance small{color:var(--muted);font-size:9px;line-height:1.7;letter-spacing:.13em;font-weight:600;text-transform:uppercase}.balance-value{display:block;margin-top:9px;color:var(--wine);font:600 35px/1.2 var(--serif)}.balance-eye{display:grid;place-items:center;flex:0 0 37px;width:37px;height:37px;border:1px solid var(--line);border-radius:50%;background:var(--paper);color:var(--wine)}.balance-eye:hover{background:var(--blush)}.balance-eye svg{width:19px;height:19px}.balance-eye .eye-off,.balance-eye.revealed .eye-on{display:none}.balance-eye.revealed .eye-off{display:block}.prank-copy{margin-top:8px;color:var(--wine2);font-size:12px;line-height:1.65}.real-balance-btn{margin-top:17px;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:#f6ecec;color:var(--wine);font-size:12px;font-weight:600}.real-balance-message{margin-top:18px;padding:20px;border-radius:11px;background:var(--wine);color:var(--paper)}.real-balance-message>span{color:#d8a4b4;font-size:9px;text-transform:uppercase;letter-spacing:.16em}.real-balance-message p{margin-top:10px;color:#ecdce2;font-size:13px;line-height:1.8}.real-balance-message strong{font:600 27px var(--serif);color:var(--paper)}.gift-balance.real-revealed{border-color:var(--rose)}.physical-gift-tease{display:flex;gap:10px;align-items:start}.physical-gift-tease span{color:var(--wine2);font-size:17px}.physical-gift-tease p{font-size:12px}.shops{display:flex;flex-wrap:wrap;gap:8px}.shop{padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:10px;font-weight:600;color:var(--wine);transition:background .2s}.shop:hover{background:var(--paper)}
+/* Music and the QR code share a spread. */
+.music{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:stretch}.music-card,.qr-card{position:relative;min-width:0;overflow:hidden;border-radius:var(--radius);padding:clamp(27px,3.4vw,43px)}.music-card{color:var(--paper);background:var(--wine)}.music-card::after{content:"";position:absolute;bottom:-120px;right:-95px;width:270px;height:270px;border:1px solid rgba(255,255,255,.07);border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 4px,rgba(255,255,255,.04) 5px 6px);pointer-events:none}.music-card .mini{color:#d3a6b5;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.17em}.music-card h3{margin:22px 0 13px;font:600 clamp(40px,4.5vw,60px)/1.1 var(--serif);letter-spacing:-.04em}.music-card>p{margin:0 0 30px;color:#d2b7c2;line-height:1.75;font-size:15px}.audio-panel{position:relative;z-index:1;display:flex;align-items:center;gap:15px;padding:21px 17px;margin:27px 0 18px;border:1px solid rgba(255,255,255,.18);border-radius:13px;background:rgba(255,255,255,.055)}.audio-disc{flex:0 0 48px;width:48px;height:48px;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:var(--paper);color:var(--wine);font-size:16px}.audio-copy{display:flex;flex-direction:column;min-width:0}.audio-copy strong{font:600 20px var(--serif)}.audio-copy small{margin-top:6px;color:#d2b5bf;font-size:11px}.eq{display:flex;flex:0 0 auto;align-items:center;gap:3px;height:29px;margin-left:auto}.eq i{width:3px;height:10px;border-radius:2px;background:#d8b19c;animation:equalizer 1s ease-in-out infinite;animation-play-state:paused}.eq i:nth-child(2){height:24px;animation-delay:.2s}.eq i:nth-child(3){height:16px;animation-delay:.4s}.eq i:nth-child(4){height:29px;animation-delay:.6s}.audio-panel.is-playing .eq i{animation-play-state:running}.music-card .music-status{margin:0;color:#ecd6df;font-size:12px;min-height:42px}.music-note{margin-top:17px;color:#caabb7;font-size:11px;line-height:1.7}.music-full-link{display:inline-block;margin-top:21px;padding-bottom:6px;border-bottom:1px solid #a77a8b;color:#f3e3dd;font-size:11px}
 
 /* Printed photographs: captions always visible, outside the picture. */
 .gallery-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:-9px 0 29px}.gallery-hint{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:11px;line-height:1.7}.gallery-hint span{color:var(--wine2);font-size:17px}.gallery-random{padding:10px 14px;border:1px solid var(--line);border-radius:7px;color:var(--wine);background:transparent;font-size:11px;font-weight:600}.gallery-random:hover{background:var(--blush)}.gallery{columns:3 250px;column-gap:23px}.shot{break-inside:avoid;margin:0 0 23px;padding:10px 10px 16px;background:var(--paper);border:1px solid var(--line);border-radius:3px;box-shadow:0 10px 25px rgba(64,35,42,.05);transition:box-shadow .3s ease}.shot-button{position:relative;display:block;width:100%;padding:0;border:0;border-radius:2px;background:#e6d7d3;cursor:zoom-in;overflow:hidden}.shot-button img{width:100%;height:auto;transition:transform .5s ease}.shot-button:hover img{transform:scale(1.025)}.song-tag{position:absolute;top:10px;left:10px;max-width:calc(100% - 20px);padding:7px 10px;border:1px solid rgba(255,255,255,.4);border-radius:5px;color:var(--paper);background:rgba(47,28,35,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shot-open{position:absolute;right:10px;bottom:10px;display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(255,255,255,.4);border-radius:50%;background:rgba(47,28,35,.45);color:white;font-size:18px}.shot figcaption{margin-top:12px;color:var(--wine2);text-align:center;font:500 25px/1.1 var(--hand);overflow-wrap:break-word}.shot.playing{outline:2px solid var(--rose);outline-offset:3px}
@@ -55,7 +54,7 @@
 .audio-panel.is-playing{border-color:rgba(216,177,156,.42)}
 .audio-disc{display:grid;place-items:center;transition:background .2s,box-shadow .2s}
 .audio-disc:hover{background:#f3e3d8;box-shadow:0 0 0 5px rgba(255,252,247,.04)}
-.music-full-link,.shop,.gallery-random{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.music-full-link,.gallery-random{display:inline-flex;align-items:center;justify-content:center;gap:7px}
 .music-card>p,.music-note,.music-full-link{position:relative;z-index:1}
 .photo-dialog :focus-visible,.music-card :focus-visible,.cinematic-final :focus-visible{outline-color:#e0b8a8}
 @media(hover:hover){.shot:hover{box-shadow:0 15px 32px rgba(64,35,42,.13)}.hero-photo:hover{box-shadow:0 2px 5px rgba(61,29,41,.07),0 30px 65px rgba(61,29,41,.18)}}
@@ -113,7 +112,7 @@ main>.keepsake{padding:70px 0 80px}
   main>section{padding:58px 0}.section-head{grid-template-columns:1fr;gap:20px;margin-bottom:30px}.section-head p{justify-self:start;font-size:14px}h2{font-size:clamp(39px,7vw,54px)}.birthday-focus{padding-top:34px;padding-bottom:35px}.birthday-focus-shell{padding:29px;border-radius:18px}.birthday-focus-top{grid-template-columns:1fr;gap:20px}.birthday-number{font-size:88px}.birthday-focus-copy h2{font-size:39px}.birthday-focus-copy p{font-size:14px}.birthday-countdown-card{grid-template-columns:1fr;gap:22px;padding:22px 19px}.birthday-countdown-card strong{font-size:25px}.birthday-countdown b{font-size:28px}.birthday-wishes{grid-template-columns:1fr;gap:13px}.birthday-wishes article{padding:24px}.birthday-wishes h3{margin-top:14px;font-size:25px}.birthday-wishes p{font-size:13px}.birthday-focus-note{padding:21px;align-items:start}.birthday-focus-note p{font-size:13px}
   .time-top{grid-template-columns:1fr;gap:23px}.time-shell{padding:29px;border-radius:18px}.time-shell h2{font-size:41px}.time-copy{font-size:13px}.relationship-label{font-size:22px}.counter-box{padding:22px 3px}.counter-box b{font-size:30px}.counter-box small{font-size:9px;letter-spacing:.05em}
   .letter{padding:29px}.letter h3{font-size:42px}.letter .intro{font-size:16px}.letter p{font-size:15px}.memory-grid{grid-template-columns:1fr;gap:18px}.memory-card{padding:27px}.memory-date b{font-size:57px}.memory-card h4,.letter-chapter h4,.wish-card h4{font-size:29px}.pullquote{padding:27px}.pullquote p{font-size:26px}.letter-emphasis{padding:22px}.letter-emphasis p{font-size:24px}.wish-card,.growth-card{padding:26px}.thanks-row{grid-template-columns:1fr;gap:0}.thanks-chip{padding:20px 5px}.letter-finale h4{font-size:34px}.timeline-wrap{grid-template-columns:1fr;gap:35px}.timeline-intro{position:static}.timeline-event h3{font-size:27px}
-  .music{grid-template-columns:1fr;gap:22px}.music-card,.gift-card{padding:29px;border-radius:18px}.music-card h3{font-size:49px}.music-card .music-status{min-height:22px}.gift-card h3{font-size:35px}.gift-card p{font-size:14px}.gift-top{gap:12px}.gift-top .eyebrow{font-size:8px;letter-spacing:.12em}
+  .music{grid-template-columns:1fr;gap:22px}.music-card,.qr-card{padding:29px;border-radius:18px}.music-card h3{font-size:49px}.music-card .music-status{min-height:22px}
   .gallery{columns:2;column-gap:13px}.shot{margin-bottom:13px;padding:7px 7px 12px}.shot figcaption{margin-top:9px;font-size:22px}.song-tag{top:7px;left:7px;max-width:calc(100% - 14px);padding:6px 7px;font-size:9px}.shot-open{width:25px;height:25px;bottom:7px;right:7px;font-size:16px}.gallery-toolbar{gap:12px;margin-bottom:21px}.gallery-hint{font-size:10px}
   .photo-dialog{width:calc(100% - 24px);max-height:calc(100% - 24px);padding:13px 15px 17px;border-radius:12px}.photo-stage{grid-template-columns:minmax(0,1fr);gap:0}.photo-stage img{max-height:58svh}.photo-arrow{position:absolute;z-index:1;bottom:15px;width:44px;height:44px;background:rgba(39,24,31,.84)}.photo-prev{left:10px}.photo-next{right:10px}.photo-dialog-bottom{margin-top:16px}#photoCaption{font-size:25px}.photo-track{flex-wrap:wrap;gap:10px;padding:12px}.modal-song{font-size:11px}#photoTrackLink{margin-left:48px}.photo-help{font-size:9px}
   .reasons-head{margin-bottom:29px}.reasons-head p{font-size:14px}.reasons-grid{gap:13px}.reason-card{padding:24px 20px}.reason-card b{font-size:23px}.reason-card p{font-size:12px}.secret-section{padding-top:15px;padding-bottom:65px}.cinematic-final{padding:82px 0 76px}.final-inner{width:calc(100% - 42px)}.cinematic-final h2{font-size:clamp(42px,7.6vw,58px)}.final-copy{font-size:14px}.final-note>div>p{padding:22px 6px;font-size:24px}.flowers-note{padding:19px 17px}.float-heart{right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:41px;height:41px}
@@ -121,7 +120,7 @@ main>.keepsake{padding:70px 0 80px}
 @media(max-width:420px){
   .wrap{width:calc(100% - 32px)}.nav{width:calc(100% - 20px);gap:5px;padding:7px 8px}.brand{font-size:13px}.navlinks{gap:0}.navlinks a{padding:9px 6px;font-size:9px}.sound-toggle{width:40px;height:40px;flex-basis:40px;font-size:16px}.hero{padding-top:104px}h1{font-size:clamp(45px,13vw,53px)}.actions{gap:12px}.btn.primary{padding:14px 17px;font-size:11px}.btn.soft{font-size:10px}.hero-photo{width:85%;padding:10px 10px 48px}.stamp{font-size:25px}
   .birthday-focus-shell,.time-shell{padding:25px 21px}.birthday-focus-copy h2{font-size:35px}.birthday-countdown-card{padding:19px 14px}.birthday-countdown{gap:5px}.birthday-countdown>div{padding:14px 3px}.birthday-countdown b{font-size:25px}.birthday-countdown span{font-size:9px;letter-spacing:.03em}.birthday-focus-note{padding:18px;gap:12px}.counter-box b{font-size:27px}.counter-box small{font-size:9px;letter-spacing:.02em}
-  .letter{padding:25px 21px}.letter h3{font-size:37px}.memory-card,.pullquote,.wish-card,.growth-card{padding:23px 17px}.memory-card h4,.letter-chapter h4,.wish-card h4{font-size:27px}.pullquote p{font-size:23px}.letter-finale h4{font-size:30px}.music-card,.gift-card{padding:26px 22px}.audio-panel{padding:17px 13px;gap:12px}.audio-copy strong{font-size:18px}.balance{padding:21px 17px}.balance-value{font-size:32px}.shop{padding:9px 10px;font-size:9px}
+  .letter{padding:25px 21px}.letter h3{font-size:37px}.memory-card,.pullquote,.wish-card,.growth-card{padding:23px 17px}.memory-card h4,.letter-chapter h4,.wish-card h4{font-size:27px}.pullquote p{font-size:23px}.letter-finale h4{font-size:30px}.music-card,.qr-card{padding:26px 22px}.audio-panel{padding:17px 13px;gap:12px}.audio-copy strong{font-size:18px}
   .gallery{column-gap:10px}.shot{margin-bottom:10px;padding:6px 6px 11px}.shot figcaption{font-size:20px}.song-tag{font-size:9px;padding:5px 6px}.reasons-grid{gap:10px}.reason-card{padding:21px 15px}.reason-icon{margin-bottom:20px}.reason-card b{font-size:20px}.reason-card p{font-size:12px}
   .entry-gate{padding-inline:22px}.entry-whisper{margin-bottom:32px;font-size:8px;letter-spacing:.13em}.entry-box h2{font-size:38px}.entry-box p{font-size:13px}.envelope{width:250px;height:149px;margin-top:70px;margin-bottom:31px}.envelope-letter{height:137px;top:-31px}.envelope-letter span{font-size:25px}.entry-date{font-size:8px}
 }
@@ -163,44 +162,15 @@ h1[tabindex="-1"]:focus-visible{outline:none}.icon-arrow{display:inline-block;wi
 @media(max-width:820px){.shot-note{margin-inline:3px;font-size:12px;line-height:1.7}#photoNote{font-size:14px;margin-bottom:17px}.timeline-heartnote{font-size:24px!important}}
 @media(max-width:360px){.shot-note{font-size:13px;margin-inline:9px}}
 
-/* The gift reads as one card: invitation, balance, note and places to choose. */
-#presente {
-  gap: 27px;
-  border-color: rgba(173,134,82,.3);
-  background: radial-gradient(ellipse at 100% 0, rgba(255,252,247,.65), transparent 48%), linear-gradient(145deg,#f4e7df,#efdadd);
-  box-shadow: 0 18px 48px rgba(89,37,56,.07);
-}
-#presente > div:first-child, #presente .gift-top > div:first-child { min-width: 0; }
-#presente .gift-top { align-items: center; gap: 18px; }
-#presente .gift-top > div:first-child { flex: 1; }
-#presente h3 { margin-top: 18px; font-size: clamp(31px,3.3vw,42px); line-height: 1.14; text-wrap: balance; }
-#presente .gift-icon { flex-basis: 52px; width: 52px; height: 52px; border: 1px solid rgba(173,134,82,.24); background: var(--paper); font-size: 24px; box-shadow: 0 6px 15px rgba(89,37,56,.04); }
-#presente > div:first-child > p { color: #67535d; font-size: 14px; line-height: 1.85; }
-#presente .gift-balance { margin: 29px 0 0; padding: 25px; border-color: rgba(173,134,82,.26); border-radius: 16px; background: var(--paper); box-shadow: 0 5px 15px rgba(89,37,56,.035); }
-#presente .balance-head { gap: 15px; }
-#presente .balance-head small { min-width: 0; color: var(--wine2); font-size: 10px; line-height: 1.8; letter-spacing: .1em; }
-#presente .balance-eye { flex-basis: 44px; width: 44px; height: 44px; background: #fbf5ef; }
-#presente .balance-eye svg { width: 21px; height: 21px; }
-#presente .balance-value { margin-top: 14px; font-size: clamp(38px,3.8vw,50px); line-height: 1.18; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
-#presente .prank-copy { margin-top: 13px; font-size: 12px; line-height: 1.85; }
-#presente .prank-copy:empty { display: none; }
-#presente .real-balance-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 47px; margin-top: 18px; padding: 13px 16px; border-color: rgba(89,37,56,.3); background: var(--blush); font-size: 12px; line-height: 1.65; }
-#presente .real-balance-message { margin-top: 21px; padding: 19px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
-#presente .real-balance-message > span { color: var(--wine2); font-size: 10px; font-weight: 600; letter-spacing: .12em; }
-#presente .real-balance-message p { margin-top: 11px; color: var(--muted); font-size: 14px; line-height: 1.85; }
-#presente .real-balance-message strong { color: var(--wine); font: 600 16px/1.85 var(--sans); }
-#presente .gift-balance.real-revealed { border-color: rgba(173,134,82,.6); background: linear-gradient(145deg,#fffcf7,#faf0e6); box-shadow: 0 9px 26px rgba(89,37,56,.065); }
-#presente .physical-gift-tease { gap: 12px; margin-top: 22px; padding-top: 19px; border-top: 1px solid rgba(89,37,56,.11); }
-#presente .physical-gift-tease > span { flex: 0 0 17px; padding-top: 1px; }
-#presente .physical-gift-tease p { color: #67535d; font-size: 12px; line-height: 1.8; }
-#presente .shops { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
-#presente .shop { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; min-height: 47px; padding: 11px 13px; border-color: rgba(89,37,56,.17); border-radius: 8px; background: rgba(255,252,247,.75); color: var(--wine); font-size: 12px; line-height: 1.5; }
-#presente .shop .icon-arrow { width: 14px; height: 14px; }
-#presente [hidden] { display: none !important; }
-@media (hover:hover) {
-  #presente .shop:hover { border-color: var(--rose); background: var(--paper); }
-  #presente .real-balance-btn:hover { background: #ecd4d8; }
-}
+.qr-card { display: flex; flex-direction: column; align-items: center; gap: 24px; border: 1px solid var(--line); background: linear-gradient(145deg,#fffcf7,#f2e3df); text-align: center; }
+.qr-card .eyebrow { justify-content: center; margin-bottom: 18px; font-size: 9px; }
+.qr-card h3 { margin: 0 0 16px; color: var(--wine); font: 600 clamp(32px,3.3vw,43px)/1.14 var(--serif); letter-spacing: -.035em; text-wrap: balance; }
+.qr-card p { max-width: 360px; margin: 0 auto; color: #67535d; font-size: 14px; line-height: 1.85; }
+.qr-image { display: block; width: min(100%,248px); padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(89,37,56,.05); }
+.qr-image img { display: block; width: 100%; height: auto; }
+.qr-downloads { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; width: 100%; }
+.qr-downloads a { min-height: 48px; padding: 12px 9px; font-size: 11px; line-height: 1.6; }
+.qr-card .qr-note { max-width: 200px; color: #67535d; font-size: 11px; line-height: 1.7; }
 
 /* The direct destinations stay handy; the rest of the story has one clear menu. */
 .nav { gap: 20px; }
@@ -224,9 +194,6 @@ h1[tabindex="-1"]:focus-visible{outline:none}.icon-arrow{display:inline-block;wi
 .navlinks .chapter-menu-panel > a:last-child { grid-column: 1 / -1; }
 .navlinks .chapter-menu-panel > a:hover, .navlinks .chapter-menu-panel > a[aria-current="location"] { border-color: var(--rose); background: var(--blush); }
 @media (max-width:820px) {
-  #presente { gap: 24px; }
-  #presente h3 { font-size: 35px; }
-  #presente .gift-icon { flex-basis: 46px; width: 46px; height: 46px; font-size: 22px; }
   .nav { gap: 12px; }
   .navlinks { gap: 4px; }
   .navlinks a { padding-inline: 9px; }
@@ -240,16 +207,4 @@ h1[tabindex="-1"]:focus-visible{outline:none}.icon-arrow{display:inline-block;wi
   .chapter-menu-panel { grid-template-columns: minmax(0,1fr); right: 10px; width: calc(100vw - 46px); padding: 17px; }
   .navlinks .chapter-menu-panel > a { padding: 11px 13px; font-size: 13px; }
   .hero { padding-top: 110px; }
-}
-@media (max-width:420px) {
-  #presente { padding: 25px 21px; }
-  #presente h3 { font-size: 32px; }
-  #presente .gift-top { gap: 13px; }
-  #presente .gift-icon { flex-basis: 44px; width: 44px; height: 44px; }
-  #presente .gift-balance { margin-top: 24px; padding: 21px 18px; }
-  #presente .balance-head { gap: 11px; }
-  #presente .balance-head small { font-size: 9px; letter-spacing: .08em; }
-  #presente .balance-value { font-size: 41px; }
-  #presente .real-balance-message p { font-size: 13px; }
-  #presente .shop { padding-inline: 11px; font-size: 11px; }
 }
