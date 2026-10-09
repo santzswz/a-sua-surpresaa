@@ -14,6 +14,7 @@ import shutil
 import threading
 import unittest
 from urllib.parse import parse_qs, unquote, urlparse
+from xml.etree import ElementTree
 
 from playwright.sync_api import expect, sync_playwright
 
@@ -340,7 +341,7 @@ class SiteTests(unittest.TestCase):
         })""")
         self.assertFalse(invisible, "Reading content must not depend on JavaScript reveal effects.")
         expect(page.locator("#secretMessage")).to_have_attribute("hidden", "")
-        expect(page.locator("#realBalanceMessage")).not_to_be_visible()
+        expect(page.locator("#siteQr")).to_be_visible()
         self.assertIsNone(page.locator("#bgMusic").get_attribute("loop"), "Music must not loop without JavaScript.")
         self.assert_no_media_requests()
 
@@ -437,30 +438,52 @@ class SiteTests(unittest.TestCase):
         self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
-    def test_gift_reveal_and_hide_do_not_expose_the_real_value(self):
-        self.enter_quietly()
-        eye = self.page.locator("#balanceEye")
-        value = self.page.locator("#balanceValue")
-        real_message = self.page.locator("#realBalanceMessage")
-        reveal = self.page.locator("#realBalanceBtn")
-        expect(value).to_have_text(re.compile(r"^R\$\s*[•·*]+$"))
-        expect(real_message).not_to_be_visible()
-        eye.click()
-        expect(eye).to_have_attribute("aria-pressed", "true")
-        expect(value).to_have_text("R$ 0,20")
-        expect(reveal).to_be_visible()
-        expect(real_message).not_to_be_visible()
-        reveal.click()
-        expect(value).to_have_text("R$ 200,00")
-        expect(real_message).to_be_visible()
-        eye.click()
-        expect(eye).to_have_attribute("aria-pressed", "false")
-        expect(value).to_have_text(re.compile(r"^R\$\s*[•·*]+$"))
-        expect(real_message).to_have_attribute("hidden", "")
-        expect(real_message).not_to_be_visible()
-        expect(reveal).not_to_be_visible()
-        value_visible = self.page.locator("#giftBalance").evaluate('el => el.innerText.includes("200,00")')
-        self.assertFalse(value_visible, "Hiding the gift balance must hide its amount everywhere in the card.")
+    def test_site_qr_loads_and_downloads_valid_files_without_requesting_audio(self):
+        self.page.goto(self.base_url + PROJECT_MOUNT + "/", wait_until="load")
+        self.page.locator("#entryQuietBtn").click()
+        expect(self.page.locator("#entryGate")).not_to_be_visible()
+        card = self.page.locator("#acesso")
+        qr = card.locator("#siteQr")
+        expect(card).to_have_attribute("aria-labelledby", "qrTitle")
+        expect(card.locator("#qrTitle")).to_be_visible()
+        expect(qr).to_be_visible()
+        expect(qr).to_have_attribute("src", "./assets/qr/sua-surpresa.svg")
+        expect(qr).to_have_attribute("width", "1080")
+        expect(qr).to_have_attribute("height", "1080")
+        qr.scroll_into_view_if_needed()
+        self.page.wait_for_function(
+            "image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0",
+            arg=qr.element_handle(),
+        )
+        expect(self.page.locator("#presente, #giftBalance, #balanceEye, #realBalanceBtn, #realBalanceMessage")).to_have_count(0)
+        old_amount_absent = self.page.evaluate(r"() => !/R\$\s*200,00/.test(document.body.textContent)")
+        self.assertTrue(old_amount_absent, "The removed balance must not remain in the page content.")
+        self.assert_no_media_requests()
+        expect(card.locator("a[download]")).to_have_count(2)
+        for extension in ("png", "svg"):
+            with self.subTest(download_format=extension):
+                filename = f"sua-surpresa-qr.{extension}"
+                link = card.locator(f'a[href="./assets/qr/sua-surpresa.{extension}"]')
+                expect(link).to_have_attribute("download", filename)
+                with self.page.expect_download() as download_event:
+                    link.click()
+                download = download_event.value
+                self.assertIsNone(download.failure(), "The QR download must complete successfully.")
+                self.assertEqual(download.suggested_filename, filename)
+                downloaded_path = download.path()
+                self.assertIsNotNone(downloaded_path)
+                contents = Path(downloaded_path).read_bytes()
+                if extension == "png":
+                    self.assertGreaterEqual(len(contents), 24, "The PNG download must contain a complete image header.")
+                    self.assertTrue(contents.startswith(b"\x89PNG\r\n\x1a\n"), "The PNG download must contain a real PNG file.")
+                    self.assertEqual(contents[12:16], b"IHDR")
+                    self.assertEqual(int.from_bytes(contents[16:20], "big"), 1080)
+                    self.assertEqual(int.from_bytes(contents[20:24], "big"), 1080)
+                else:
+                    document = ElementTree.fromstring(contents)
+                    self.assertEqual(document.tag, "{http://www.w3.org/2000/svg}svg")
+                    self.assertGreater(len(document), 0, "The printable SVG must contain the QR artwork.")
+        self.assert_no_media_requests()
         self.assert_no_runtime_errors()
 
     def test_secret_and_final_note_match_their_accessible_state(self):
@@ -1491,16 +1514,16 @@ class SiteTests(unittest.TestCase):
         self.assertFalse(menu.evaluate("element => element.open"))
         expect(summary).to_be_focused()
         summary.press("Enter")
-        shortcut = panel.locator('a[href="#presente"]')
+        shortcut = panel.locator('a[href="#acesso"]')
         target = shortcut.get_attribute("href")
         shortcut.click()
         self.page.wait_for_function("hash => location.hash === hash", arg=target)
         self.assertFalse(menu.evaluate("element => element.open"))
-        expect(self.page.locator("#presente").locator("h1, h2, h3").first).to_be_focused()
-        gift_links = self.page.locator('.chapter-nav a[href="#presente"]')
-        expect(gift_links).to_have_count(2)
+        expect(self.page.locator("#acesso").locator("h1, h2, h3").first).to_be_focused()
+        access_links = self.page.locator('.chapter-nav a[href="#acesso"]')
+        expect(access_links).to_have_count(2)
         for index in range(2):
-            expect(gift_links.nth(index)).to_have_attribute("aria-current", "location")
+            expect(access_links.nth(index)).to_have_attribute("aria-current", "location")
         summary.click()
         expect(panel).to_be_visible()
         self.page.mouse.click(3, self.page.viewport_size["height"] - 10)

@@ -471,29 +471,6 @@
   byId('entryQuietBtn')?.addEventListener('click', () => openSurprise(false));
   entryGate?.addEventListener('cancel', event => { event.preventDefault(); openSurprise(false); });
 
-  let balanceVisible = false;
-  let realRevealed = false;
-  function renderBalance() {
-    const eye = byId('balanceEye');
-    const message = byId('realBalanceMessage');
-    setText('balanceValue', balanceVisible ? realRevealed ? 'R$ 200,00' : 'R$ 0,20' : 'R$ ••••');
-    setText('balanceLabel', !balanceVisible ? 'Saldo do seu presente' : realRevealed ? 'Agora é o saldo de verdade' : 'Seu saldo… eu juro');
-    setText('prankCopy', balanceVisible && !realRevealed ? 'KKKKKK calma, minha benção. Eu não sou tão miserável assim.' : '');
-    eye?.classList.toggle('revealed', balanceVisible);
-    eye?.setAttribute('aria-pressed', String(balanceVisible));
-    eye?.setAttribute('aria-label', balanceVisible ? 'Ocultar saldo' : 'Mostrar saldo');
-    if (byId('realBalanceBtn')) byId('realBalanceBtn').hidden = !balanceVisible || realRevealed;
-    if (message) message.hidden = !balanceVisible || !realRevealed;
-  }
-  byId('balanceEye')?.addEventListener('click', () => { balanceVisible = !balanceVisible; renderBalance(); });
-  byId('realBalanceBtn')?.addEventListener('click', () => {
-    realRevealed = true; balanceVisible = true;
-    byId('giftBalance')?.classList.add('real-revealed');
-    renderBalance();
-    byId('balanceEye')?.focus({ preventScroll: true });
-    confetti();
-  });
-  renderBalance();
   function disclosure(buttonId, contentId, closedText, openText, burst = false) {
     const button = byId(buttonId);
     const content = byId(contentId);
